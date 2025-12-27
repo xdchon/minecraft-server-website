@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TemptCraft Control Panel</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="logo">TemptCraft</div>
+      <div class="logo-sub">Private Minecraft Studio</div>
+      <div class="theme-toggle">
+        <span>Theme</span>
+        <button id="themeBtn" class="pill">Dark</button>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-view="view-servers">Servers</button>
+        <button class="nav-item" data-view="view-create">Create</button>
+        <button class="nav-item" data-view="view-settings">Settings</button>
+        <button class="nav-item" data-view="view-mods">Mods</button>
+        <button class="nav-item" data-view="view-console">Console</button>
+      </nav>
+      <div class="sidebar-card">
+        <div class="sidebar-title">Fleet Status</div>
+        <div class="sidebar-metric" id="countTotal">0 total</div>
+        <div class="sidebar-metric" id="countRunning">0 running</div>
+        <div class="sidebar-metric" id="countStopped">0 stopped</div>
+      </div>
+      <div class="sidebar-footer">Inspired by Aternos / Exaroton</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="active-server">
+          <div class="label">Active server</div>
+          <div id="activeServerName" class="value">No server selected</div>
+          <div id="activeServerMeta" class="meta">Select a server from the list.</div>
+        </div>
+        <div class="top-actions">
+          <button id="refreshBtn" class="btn ghost">Refresh</button>
+          <button id="startBtn" class="btn">Start</button>
+          <button id="stopBtn" class="btn">Stop</button>
+          <button id="restartBtn" class="btn">Restart</button>
+        </div>
+      </header>
+
+      <section id="view-servers" class="view active">
+        <div class="panel-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Servers</h2>
+              <button id="newServerBtn" class="btn">New server</button>
+            </div>
+            <div id="serverList" class="server-list"></div>
+            <div id="emptyState" class="empty">No servers yet. Create your first world.</div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Overview</h2>
+            </div>
+            <div class="overview">
+              <div class="overview-item">
+                <span>Status</span>
+                <strong id="overviewStatus">-</strong>
+              </div>
+              <div class="overview-item">
+                <span>Port</span>
+                <strong id="overviewPort">-</strong>
+              </div>
+              <div class="overview-item">
+                <span>Version</span>
+                <strong id="overviewVersion">-</strong>
+              </div>
+              <div class="overview-item">
+                <span>Type</span>
+                <strong id="overviewType">-</strong>
+              </div>
+            </div>
+            <div class="panel-note">Select a server to edit settings, install mods, or open the console.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-create" class="view">
+        <div class="panel-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Create Server</h2>
+              <span class="chip">new instance</span>
+            </div>
+            <form id="createForm" class="form">
+              <div class="tabs">
+                <button class="tab active" data-tab="create-essentials" type="button">Essentials</button>
+                <button class="tab" data-tab="create-gameplay" type="button">Gameplay</button>
+                <button class="tab" data-tab="create-world" type="button">World</button>
+                <button class="tab" data-tab="create-access" type="button">Access</button>
+                <button class="tab" data-tab="create-performance" type="button">Performance</button>
+                <button class="tab" data-tab="create-network" type="button">Network</button>
+                <button class="tab" data-tab="create-misc" type="button">Misc</button>
+              </div>
+
+              <div class="tab-content active" data-tab-panel="create-essentials">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Server name</label>
+                    <input id="createName" type="text" placeholder="My friends SMP" required />
+                  </div>
+                  <div class="field">
+                    <label>Minecraft version</label>
+                    <input id="createVersion" type="text" placeholder="1.20.4" />
+                  </div>
+                  <div class="field">
+                    <label>Server type</label>
+                    <select id="createType">
+                      <option value="VANILLA">Vanilla</option>
+                      <option value="PAPER">Paper</option>
+                      <option value="FABRIC">Fabric</option>
+                      <option value="FORGE">Forge</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Memory (MB)</label>
+                    <input id="createMemory" type="range" min="512" max="16384" step="256" value="2048" />
+                    <div id="createMemoryValue" class="hint">2048 MB</div>
+                  </div>
+                  <div class="field">
+                    <label>Server port (auto if blank)</label>
+                    <input id="createPort" type="number" min="1" max="65535" placeholder="25565" />
+                  </div>
+                  <div class="field">
+                    <label>Message of the day</label>
+                    <input id="createMotd" type="text" placeholder="Welcome to TemptCraft" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="create-gameplay">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Gamemode</label>
+                    <select id="createGamemode">
+                      <option value="survival">Survival</option>
+                      <option value="creative">Creative</option>
+                      <option value="adventure">Adventure</option>
+                      <option value="spectator">Spectator</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Difficulty</label>
+                    <select id="createDifficulty">
+                      <option value="peaceful">Peaceful</option>
+                      <option value="easy">Easy</option>
+                      <option value="normal" selected>Normal</option>
+                      <option value="hard">Hard</option>
+                    </select>
+                  </div>
+                  <label class="toggle">
+                    <input id="createPvp" type="checkbox" checked />
+                    <span>PVP enabled</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createHardcore" type="checkbox" />
+                    <span>Hardcore mode</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createAllowNether" type="checkbox" checked />
+                    <span>Allow Nether</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createAllowEnd" type="checkbox" checked />
+                    <span>Allow End</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createCommandBlocks" type="checkbox" />
+                    <span>Enable command blocks</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="create-world">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>World seed</label>
+                    <input id="createLevelSeed" type="text" placeholder="Leave blank for random" />
+                  </div>
+                  <div class="field">
+                    <label>World type</label>
+                    <input id="createLevelType" type="text" placeholder="default, flat, largebiomes" />
+                  </div>
+                  <div class="field">
+                    <label>Spawn protection</label>
+                    <input id="createSpawnProtection" type="number" min="0" max="64" value="16" />
+                  </div>
+                  <label class="toggle">
+                    <input id="createSpawnAnimals" type="checkbox" checked />
+                    <span>Spawn animals</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createSpawnMonsters" type="checkbox" checked />
+                    <span>Spawn monsters</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createSpawnNpcs" type="checkbox" checked />
+                    <span>Spawn NPCs</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="create-access">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Max players</label>
+                    <input id="createMaxPlayers" type="number" min="1" max="200" value="20" />
+                  </div>
+                  <div class="field">
+                    <label>OP permission level</label>
+                    <select id="createOpPermissionLevel">
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4" selected>4</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Idle timeout (minutes)</label>
+                    <input id="createIdleTimeout" type="number" min="0" max="999" value="0" />
+                  </div>
+                  <label class="toggle">
+                    <input id="createOnlineMode" type="checkbox" checked />
+                    <span>Online mode (auth)</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createWhitelist" type="checkbox" />
+                    <span>Enable whitelist</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="create-performance">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>View distance</label>
+                    <input id="createViewDistance" type="number" min="4" max="32" value="10" />
+                  </div>
+                  <div class="field">
+                    <label>Simulation distance</label>
+                    <input id="createSimulationDistance" type="number" min="4" max="32" value="10" />
+                  </div>
+                  <div class="field">
+                    <label>Max tick time</label>
+                    <input id="createMaxTickTime" type="number" value="60000" />
+                  </div>
+                  <div class="field">
+                    <label>Entity broadcast range (%)</label>
+                    <input id="createEntityBroadcastRange" type="number" min="10" max="500" value="100" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="create-network">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Server IP (optional)</label>
+                    <input id="createServerIp" type="text" placeholder="Leave blank" />
+                  </div>
+                  <div class="field">
+                    <label>Enable query</label>
+                    <select id="createEnableQuery">
+                      <option value="false">No</option>
+                      <option value="true">Yes</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Query port</label>
+                    <input id="createQueryPort" type="number" min="1" max="65535" value="25565" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="create-misc">
+                <div class="form-grid">
+                  <label class="toggle">
+                    <input id="createEnableRcon" type="checkbox" checked />
+                    <span>Enable RCON</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createAllowFlight" type="checkbox" />
+                    <span>Allow flight</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createBroadcastConsole" type="checkbox" checked />
+                    <span>Broadcast console to ops</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createBroadcastRcon" type="checkbox" checked />
+                    <span>Broadcast RCON to ops</span>
+                  </label>
+                  <div class="field">
+                    <label>Resource pack URL</label>
+                    <input id="createResourcePack" type="text" placeholder="https://example.com/pack.zip" />
+                  </div>
+                  <div class="field">
+                    <label>Resource pack SHA1</label>
+                    <input id="createResourcePackSha1" type="text" placeholder="Optional hash" />
+                  </div>
+                  <div class="field">
+                    <label>RCON password (optional)</label>
+                    <input id="createRconPassword" type="text" placeholder="Leave blank to auto-generate" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-footer">
+                <label class="toggle">
+                  <input id="createEula" type="checkbox" checked />
+                  <span>I accept the Minecraft EULA</span>
+                </label>
+                <button type="submit" class="btn primary">Create server</button>
+              </div>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Tips</h2>
+            </div>
+            <ul class="tips">
+              <li>Fabric and Forge allow mods. Vanilla and Paper are plugin-friendly.</li>
+              <li>Enable whitelist and add players from the Settings tab.</li>
+              <li>Use Mods tab to search Modrinth and install with one click.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-settings" class="view">
+        <div class="panel-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Settings</h2>
+              <span id="settingsServerBadge" class="chip">No server</span>
+            </div>
+            <div class="tabs">
+              <button class="tab active" data-tab="settings-gameplay" type="button">Gameplay</button>
+              <button class="tab" data-tab="settings-world" type="button">World</button>
+              <button class="tab" data-tab="settings-access" type="button">Access</button>
+              <button class="tab" data-tab="settings-performance" type="button">Performance</button>
+              <button class="tab" data-tab="settings-network" type="button">Network</button>
+              <button class="tab" data-tab="settings-misc" type="button">Misc</button>
+              <button class="tab" data-tab="settings-whitelist" type="button">Whitelist</button>
+              <button class="tab" data-tab="settings-danger" type="button">Danger</button>
+            </div>
+            <form id="settingsForm" class="form">
+              <div class="tab-content active" data-tab-panel="settings-gameplay">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Gamemode</label>
+                    <select id="settingsGamemode">
+                      <option value="survival">Survival</option>
+                      <option value="creative">Creative</option>
+                      <option value="adventure">Adventure</option>
+                      <option value="spectator">Spectator</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Difficulty</label>
+                    <select id="settingsDifficulty">
+                      <option value="peaceful">Peaceful</option>
+                      <option value="easy">Easy</option>
+                      <option value="normal">Normal</option>
+                      <option value="hard">Hard</option>
+                    </select>
+                  </div>
+                  <label class="toggle">
+                    <input id="settingsPvp" type="checkbox" />
+                    <span>PVP enabled</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsHardcore" type="checkbox" />
+                    <span>Hardcore mode</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsAllowNether" type="checkbox" />
+                    <span>Allow Nether</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsAllowEnd" type="checkbox" />
+                    <span>Allow End</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsCommandBlocks" type="checkbox" />
+                    <span>Enable command blocks</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="settings-world">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>World seed</label>
+                    <input id="settingsLevelSeed" type="text" />
+                  </div>
+                  <div class="field">
+                    <label>World type</label>
+                    <input id="settingsLevelType" type="text" />
+                  </div>
+                  <div class="field">
+                    <label>Spawn protection</label>
+                    <input id="settingsSpawnProtection" type="number" min="0" max="64" />
+                  </div>
+                  <label class="toggle">
+                    <input id="settingsSpawnAnimals" type="checkbox" />
+                    <span>Spawn animals</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsSpawnMonsters" type="checkbox" />
+                    <span>Spawn monsters</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsSpawnNpcs" type="checkbox" />
+                    <span>Spawn NPCs</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="settings-access">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Max players</label>
+                    <input id="settingsMaxPlayers" type="number" min="1" max="200" />
+                  </div>
+                  <div class="field">
+                    <label>OP permission level</label>
+                    <select id="settingsOpPermissionLevel">
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Idle timeout (minutes)</label>
+                    <input id="settingsPlayerIdleTimeout" type="number" min="0" max="999" />
+                  </div>
+                  <label class="toggle">
+                    <input id="settingsOnlineMode" type="checkbox" />
+                    <span>Online mode (auth)</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsWhitelist" type="checkbox" />
+                    <span>Enable whitelist</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="settings-performance">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>View distance</label>
+                    <input id="settingsViewDistance" type="number" min="4" max="32" />
+                  </div>
+                  <div class="field">
+                    <label>Simulation distance</label>
+                    <input id="settingsSimulationDistance" type="number" min="4" max="32" />
+                  </div>
+                  <div class="field">
+                    <label>Max tick time</label>
+                    <input id="settingsMaxTickTime" type="number" />
+                  </div>
+                  <div class="field">
+                    <label>Entity broadcast range (%)</label>
+                    <input id="settingsEntityBroadcastRange" type="number" min="10" max="500" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="settings-network">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Server port</label>
+                    <input id="settingsServerPort" type="number" min="1" max="65535" />
+                    <div class="hint">Changing port recreates the container.</div>
+                  </div>
+                  <div class="field">
+                    <label>Server IP</label>
+                    <input id="settingsServerIp" type="text" />
+                  </div>
+                  <div class="field">
+                    <label>MOTD</label>
+                    <input id="settingsMotd" type="text" />
+                  </div>
+                  <div class="field">
+                    <label>Enable query</label>
+                    <select id="settingsEnableQuery">
+                      <option value="false">No</option>
+                      <option value="true">Yes</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Query port</label>
+                    <input id="settingsQueryPort" type="number" min="1" max="65535" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="settings-misc">
+                <div class="form-grid">
+                  <label class="toggle">
+                    <input id="settingsAllowFlight" type="checkbox" />
+                    <span>Allow flight</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsBroadcastConsoleToOps" type="checkbox" />
+                    <span>Broadcast console to ops</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsBroadcastRconToOps" type="checkbox" />
+                    <span>Broadcast RCON to ops</span>
+                  </label>
+                  <div class="field">
+                    <label>Resource pack URL</label>
+                    <input id="settingsResourcePack" type="text" />
+                  </div>
+                  <div class="field">
+                    <label>Resource pack SHA1</label>
+                    <input id="settingsResourcePackSha1" type="text" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="settings-whitelist">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Add player</label>
+                    <div class="inline-input">
+                      <input id="whitelistName" type="text" placeholder="playername" />
+                      <button id="whitelistAddBtn" class="btn" type="button">Add</button>
+                    </div>
+                    <div class="hint">Requires RCON enabled and server running.</div>
+                  </div>
+                  <div class="field">
+                    <label>Whitelisted players</label>
+                    <div id="whitelistList" class="list"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="settings-danger">
+                <div class="form-grid">
+                  <div class="danger-box">
+                    <h3>Delete server</h3>
+                    <p>Remove the container and optionally its data. This cannot be undone.</p>
+                    <label class="toggle">
+                      <input id="deleteKeepData" type="checkbox" checked />
+                      <span>Keep world data</span>
+                    </label>
+                    <label class="toggle">
+                      <input id="deleteConfirm" type="checkbox" />
+                      <span>I understand the consequences</span>
+                    </label>
+                    <button id="deleteServerBtn" class="btn danger" type="button">Delete server</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-footer">
+                <label class="toggle">
+                  <input id="settingsRestart" type="checkbox" checked />
+                  <span>Restart after saving</span>
+                </label>
+                <button type="submit" class="btn primary">Save settings</button>
+              </div>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Notes</h2>
+            </div>
+            <ul class="tips">
+              <li>Whitelist on? Add players here or they cannot join.</li>
+              <li>Some settings need a restart to apply.</li>
+              <li>Server port changes recreate the container.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-mods" class="view">
+        <div class="panel-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Modrinth Search</h2>
+              <span class="chip">Fabric first</span>
+            </div>
+            <div class="form-grid">
+              <div class="field">
+                <label>Search</label>
+                <input id="modSearchInput" type="text" placeholder="Search mods" />
+              </div>
+              <div class="field">
+                <label>Loader</label>
+                <select id="modLoader">
+                  <option value="fabric" selected>Fabric</option>
+                  <option value="forge">Forge</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Game version</label>
+                <input id="modGameVersion" type="text" placeholder="1.20.4" />
+              </div>
+              <div class="field">
+                <label>Restart after install</label>
+                <select id="modRestart">
+                  <option value="true" selected>Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </div>
+              <div class="field">
+                <button id="modSearchBtn" class="btn primary" type="button">Search Modrinth</button>
+              </div>
+            </div>
+            <div id="modSearchResults" class="list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Installed Mods</h2>
+            </div>
+            <div id="installedMods" class="list"></div>
+            <div class="hint">Install and remove mods for the active server.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-console" class="view">
+        <div class="panel-grid">
+          <div class="panel wide">
+            <div class="panel-header">
+              <h2>Live Console</h2>
+            </div>
+            <div class="console">
+              <div class="console-top">
+                <select id="consoleServerSelect"></select>
+                <div class="console-actions">
+                  <button id="liveLogsBtn" class="btn">Start live</button>
+                  <button id="fetchLogsBtn" class="btn ghost">Fetch logs</button>
+                  <button id="clearLogsBtn" class="btn ghost">Clear</button>
+                </div>
+              </div>
+              <pre id="logOutput">Select a server and fetch logs.</pre>
+              <div class="console-command">
+                <input id="commandInput" type="text" placeholder="Type a console command" />
+                <button id="sendCommandBtn" class="btn primary">Send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,820 @@
+import json
+import os
+import re
+import shutil
+import uuid
+from typing import Dict, Iterable, Optional
+
+from docker.errors import DockerException
+
+from ..config import settings
+from ..docker_client import docker_client
+from ..models import (
+    CommandRequest,
+    CommandResponse,
+    ServerActionResponse,
+    ServerCreateRequest,
+    ServerCreateResponse,
+    ServerInfo,
+    ServerSettings,
+    ServerSettingsResponse,
+    WhitelistActionRequest,
+    WhitelistResponse,
+    ModInstallRequest,
+    ModInstallResponse,
+    ModListResponse,
+)
+from .modrinth_service import ModrinthError, ModrinthService
+
+
+class ServiceError(Exception):
+    def __init__(self, status_code: int, message: str) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.message = message
+
+
+PROPERTY_MAP = {
+    "motd": "motd",
+    "max_players": "max-players",
+    "difficulty": "difficulty",
+    "gamemode": "gamemode",
+    "view_distance": "view-distance",
+    "simulation_distance": "simulation-distance",
+    "online_mode": "online-mode",
+    "whitelist": "white-list",
+    "pvp": "pvp",
+    "hardcore": "hardcore",
+    "allow_nether": "allow-nether",
+    "allow_end": "allow-end",
+    "allow_flight": "allow-flight",
+    "spawn_protection": "spawn-protection",
+    "level_seed": "level-seed",
+    "level_type": "level-type",
+    "spawn_animals": "spawn-animals",
+    "spawn_monsters": "spawn-monsters",
+    "spawn_npcs": "spawn-npcs",
+    "op_permission_level": "op-permission-level",
+    "player_idle_timeout": "player-idle-timeout",
+    "max_tick_time": "max-tick-time",
+    "entity_broadcast_range_percentage": "entity-broadcast-range-percentage",
+    "server_port": "server-port",
+    "server_ip": "server-ip",
+    "broadcast_console_to_ops": "broadcast-console-to-ops",
+    "broadcast_rcon_to_ops": "broadcast-rcon-to-ops",
+    "enable_query": "enable-query",
+    "query_port": "query.port",
+    "resource_pack": "resource-pack",
+    "resource_pack_sha1": "resource-pack-sha1",
+    "enable_command_block": "enable-command-block",
+}
+
+BOOL_FIELDS = {
+    "online_mode",
+    "whitelist",
+    "pvp",
+    "allow_flight",
+    "enable_command_block",
+    "hardcore",
+    "allow_nether",
+    "allow_end",
+    "spawn_animals",
+    "spawn_monsters",
+    "spawn_npcs",
+    "broadcast_console_to_ops",
+    "broadcast_rcon_to_ops",
+    "enable_query",
+}
+INT_FIELDS = {
+    "max_players",
+    "view_distance",
+    "simulation_distance",
+    "spawn_protection",
+    "op_permission_level",
+    "player_idle_timeout",
+    "max_tick_time",
+    "entity_broadcast_range_percentage",
+    "server_port",
+    "query_port",
+}
+
+
+class MinecraftService:
+    def __init__(self, modrinth: Optional[ModrinthService] = None) -> None:
+        self.modrinth = modrinth or ModrinthService()
+
+    def list_servers(self) -> list[ServerInfo]:
+        try:
+            containers = docker_client.containers.list(
+                all=True,
+                filters={"label": f"{settings.managed_label}={settings.managed_label_value}"},
+            )
+        except DockerException as exc:
+            raise ServiceError(503, f"Docker unavailable: {exc}") from exc
+        return [self._container_to_info(container) for container in containers]
+
+    def create_server(self, request: ServerCreateRequest) -> ServerCreateResponse:
+        enable_rcon, rcon_password = self._resolve_rcon(request)
+
+        server_id = uuid.uuid4().hex
+        display_name = request.name.strip()
+        if not display_name:
+            raise ServiceError(400, "name cannot be blank")
+        safe_name = self._sanitize_name(display_name)
+        memory_mb = request.memory_mb or settings.default_memory_mb
+
+        self._ensure_data_root()
+        local_dir = self._server_dir(settings.data_root, server_id)
+        host_dir = self._server_dir(settings.host_data_root, server_id)
+
+        try:
+            os.makedirs(local_dir, exist_ok=False)
+        except FileExistsError as exc:
+            raise ServiceError(409, "Server data directory already exists") from exc
+        except OSError as exc:
+            raise ServiceError(500, f"Failed to create server directory: {exc}") from exc
+
+        container = None
+        try:
+            port = self._select_port(request.port)
+            labels = self._labels(
+                server_id,
+                display_name,
+                host_dir,
+                local_dir,
+                enable_rcon,
+                memory_mb,
+                request.version,
+                request.server_type.upper() if request.server_type else None,
+            )
+            env = self._build_env(request, memory_mb, enable_rcon, rcon_password, port)
+            container = docker_client.containers.run(
+                settings.minecraft_image,
+                name=f"mc_{safe_name}_{server_id[:6]}",
+                detach=True,
+                ports={f"{port}/tcp": port},
+                volumes={host_dir: {"bind": "/data", "mode": "rw"}},
+                environment=env,
+                labels=labels,
+                mem_limit=f"{memory_mb}m",
+            )
+            container.reload()
+        except DockerException as exc:
+            if container is not None:
+                try:
+                    container.remove(force=True)
+                except DockerException:
+                    pass
+            shutil.rmtree(local_dir, ignore_errors=True)
+            raise ServiceError(500, f"Failed to create server: {exc}") from exc
+
+        server_info = self._container_to_info(container)
+        return ServerCreateResponse(message="server created", server=server_info)
+
+    def start_server(self, server_id: str) -> ServerActionResponse:
+        container = self._get_container_by_server_id(server_id)
+        try:
+            container.start()
+        except DockerException as exc:
+            raise ServiceError(500, f"Failed to start server: {exc}") from exc
+        return ServerActionResponse(server_id=server_id, status="started")
+
+    def stop_server(self, server_id: str) -> ServerActionResponse:
+        container = self._get_container_by_server_id(server_id)
+        try:
+            container.stop()
+        except DockerException as exc:
+            raise ServiceError(500, f"Failed to stop server: {exc}") from exc
+        return ServerActionResponse(server_id=server_id, status="stopped")
+
+    def restart_server(self, server_id: str) -> ServerActionResponse:
+        container = self._get_container_by_server_id(server_id)
+        try:
+            container.restart()
+        except DockerException as exc:
+            raise ServiceError(500, f"Failed to restart server: {exc}") from exc
+        return ServerActionResponse(server_id=server_id, status="restarted")
+
+    def delete_server(self, server_id: str, retain_data: bool) -> ServerActionResponse:
+        container = self._get_container_by_server_id(server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        try:
+            container.remove(force=True)
+        except DockerException as exc:
+            raise ServiceError(500, f"Failed to delete server: {exc}") from exc
+
+        if not retain_data:
+            self._validate_local_dir(local_dir)
+            self._safe_remove_dir(local_dir)
+
+        return ServerActionResponse(server_id=server_id, status="deleted")
+
+    def get_logs(
+        self, server_id: str, follow: bool, tail: Optional[int]
+    ) -> Iterable[bytes] | bytes:
+        container = self._get_container_by_server_id(server_id)
+        try:
+            kwargs = {"stream": follow, "follow": follow}
+            if tail is not None:
+                kwargs["tail"] = tail
+            return container.logs(**kwargs)
+        except DockerException as exc:
+            raise ServiceError(500, f"Failed to fetch logs: {exc}") from exc
+
+    def send_command(self, server_id: str, request: CommandRequest) -> CommandResponse:
+        container = self._get_container_by_server_id(server_id)
+        container.reload()
+        if container.status != "running":
+            raise ServiceError(409, "Server must be running to accept commands")
+        if not self._is_rcon_enabled(container):
+            raise ServiceError(409, "RCON is disabled for this server")
+        try:
+            result = container.exec_run(["rcon-cli", request.command], stdout=True, stderr=True)
+        except DockerException as exc:
+            raise ServiceError(500, f"Failed to send command: {exc}") from exc
+
+        output = result.output.decode("utf-8", errors="replace") if result.output else ""
+        if result.exit_code != 0:
+            raise ServiceError(500, f"Command failed: {output.strip()}")
+        return CommandResponse(server_id=server_id, exit_code=result.exit_code, output=output)
+
+    def get_settings(self, server_id: str) -> ServerSettingsResponse:
+        container = self._get_container_by_server_id(server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        properties = self._read_server_properties(local_dir)
+        settings_payload = self._properties_to_settings(properties)
+        return ServerSettingsResponse(server_id=server_id, settings=settings_payload)
+
+    def update_settings(
+        self, server_id: str, request: ServerSettings, restart: bool
+    ) -> ServerSettingsResponse:
+        container = self._get_container_by_server_id(server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        updates = self._settings_to_properties(request)
+        if not updates:
+            raise ServiceError(400, "No settings provided")
+
+        if request.server_port is not None:
+            _, current_host_port = self._get_primary_ports(container)
+            used_ports = self._get_used_ports()
+            if current_host_port in used_ports:
+                used_ports.remove(current_host_port)
+            if request.server_port in used_ports:
+                raise ServiceError(409, f"Port {request.server_port} is already in use")
+
+        try:
+            self._write_server_properties(local_dir, updates)
+        except OSError as exc:
+            raise ServiceError(500, f"Failed to update server settings: {exc}") from exc
+
+        if request.server_port is not None:
+            self._recreate_container_for_port(container, server_id, request.server_port)
+            return self.get_settings(server_id)
+
+        if restart:
+            try:
+                container.restart()
+            except DockerException as exc:
+                raise ServiceError(500, f"Failed to restart server: {exc}") from exc
+
+        return self.get_settings(server_id)
+
+    def get_whitelist(self, server_id: str) -> WhitelistResponse:
+        container = self._get_container_by_server_id(server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        path = os.path.join(local_dir, "whitelist.json")
+        names: list[str] = []
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as handle:
+                    data = json.load(handle)
+                if isinstance(data, list):
+                    for entry in data:
+                        if isinstance(entry, dict) and "name" in entry:
+                            names.append(str(entry["name"]))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ServiceError(500, f"Failed to read whitelist: {exc}") from exc
+        return WhitelistResponse(server_id=server_id, names=sorted(set(names)))
+
+    def update_whitelist(
+        self, server_id: str, request: WhitelistActionRequest
+    ) -> WhitelistResponse:
+        action = request.action.lower().strip()
+        if action not in {"add", "remove"}:
+            raise ServiceError(400, "Invalid whitelist action")
+
+        container = self._get_container_by_server_id(server_id)
+        container.reload()
+        if container.status != "running":
+            raise ServiceError(409, "Server must be running to change whitelist")
+        if not self._is_rcon_enabled(container):
+            raise ServiceError(409, "RCON must be enabled to manage whitelist")
+
+        command = f"whitelist {action} {request.name}"
+        self._exec_rcon(container, command)
+        self._exec_rcon(container, "whitelist reload")
+        return self.get_whitelist(server_id)
+
+    def list_mods(self, server_id: str) -> ModListResponse:
+        container = self._get_container_by_server_id(server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        mods_dir = os.path.join(local_dir, "mods")
+        if not os.path.exists(mods_dir):
+            return ModListResponse(server_id=server_id, mods=[])
+        mods = [
+            name
+            for name in os.listdir(mods_dir)
+            if name.lower().endswith(".jar") and os.path.isfile(os.path.join(mods_dir, name))
+        ]
+        return ModListResponse(server_id=server_id, mods=sorted(mods))
+
+    def install_mod(
+        self, server_id: str, request: ModInstallRequest, restart: bool
+    ) -> ModInstallResponse:
+        container = self._get_container_by_server_id(server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        self._ensure_modded(container)
+
+        try:
+            version_data = self._resolve_mod_version(request)
+            file_info = self._select_mod_file(version_data)
+        except ModrinthError as exc:
+            raise ServiceError(exc.status_code, exc.message) from exc
+        filename = file_info.get("filename")
+        url = file_info.get("url")
+        if not filename or not url:
+            raise ServiceError(500, "Modrinth version is missing a file URL")
+        if not filename.lower().endswith(".jar"):
+            raise ServiceError(400, "Unsupported mod file type")
+
+        mods_dir = os.path.join(local_dir, "mods")
+        os.makedirs(mods_dir, exist_ok=True)
+        dest_path = os.path.join(mods_dir, filename)
+        if os.path.exists(dest_path):
+            raise ServiceError(409, "Mod already installed")
+
+        try:
+            self._download_file(url, dest_path)
+        except ModrinthError as exc:
+            raise ServiceError(exc.status_code, exc.message) from exc
+        except OSError as exc:
+            raise ServiceError(500, f"Failed to save mod file: {exc}") from exc
+
+        if restart:
+            try:
+                container.restart()
+            except DockerException as exc:
+                raise ServiceError(500, f"Failed to restart server: {exc}") from exc
+
+        return ModInstallResponse(server_id=server_id, filename=filename)
+
+    def remove_mod(
+        self, server_id: str, filename: str, restart: bool
+    ) -> ModListResponse:
+        container = self._get_container_by_server_id(server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        self._ensure_modded(container)
+
+        safe_name = os.path.basename(filename)
+        if safe_name != filename or not safe_name.lower().endswith(".jar"):
+            raise ServiceError(400, "Invalid mod filename")
+
+        mods_dir = os.path.join(local_dir, "mods")
+        target = os.path.join(mods_dir, safe_name)
+        if not os.path.exists(target):
+            raise ServiceError(404, "Mod not found")
+        try:
+            os.remove(target)
+        except OSError as exc:
+            raise ServiceError(500, f"Failed to remove mod: {exc}") from exc
+
+        if restart:
+            try:
+                container.restart()
+            except DockerException as exc:
+                raise ServiceError(500, f"Failed to restart server: {exc}") from exc
+
+        return self.list_mods(server_id)
+
+    def _ensure_data_root(self) -> None:
+        try:
+            os.makedirs(settings.data_root, exist_ok=True)
+        except OSError as exc:
+            raise ServiceError(500, f"Failed to create data root: {exc}") from exc
+
+    def _server_dir(self, root: str, server_id: str) -> str:
+        return os.path.join(root, server_id)
+
+    def _safe_remove_dir(self, path: str) -> None:
+        root = os.path.realpath(settings.data_root)
+        target = os.path.realpath(path)
+        if target == root or not target.startswith(root + os.sep):
+            raise ServiceError(400, "Refusing to delete path outside data root")
+        if not os.path.exists(target):
+            return
+        try:
+            shutil.rmtree(target)
+        except OSError as exc:
+            raise ServiceError(500, f"Failed to delete server data: {exc}") from exc
+
+    def _sanitize_name(self, name: str) -> str:
+        cleaned = re.sub(r"[^a-zA-Z0-9_-]+", "-", name).strip("-_").lower()
+        return cleaned or "server"
+
+    def _labels(
+        self,
+        server_id: str,
+        name: str,
+        host_dir: str,
+        local_dir: str,
+        enable_rcon: bool,
+        memory_mb: int,
+        version: Optional[str],
+        server_type: Optional[str],
+    ) -> Dict[str, str]:
+        modded = self._is_modded(server_type)
+        return {
+            settings.managed_label: settings.managed_label_value,
+            "mc.server_id": server_id,
+            "mc.server_name": name,
+            "mc.server_dir": host_dir,
+            "mc.server_dir_local": local_dir,
+            "mc.rcon_enabled": "true" if enable_rcon else "false",
+            "mc.memory_mb": str(memory_mb),
+            "mc.version": version or "",
+            "mc.server_type": server_type or "",
+            "mc.modded": "true" if modded else "false",
+        }
+
+    def _select_port(self, requested: Optional[int]) -> int:
+        used_ports = self._get_used_ports()
+        if requested is not None:
+            if requested in used_ports:
+                raise ServiceError(409, f"Port {requested} is already in use")
+            return requested
+
+        start = settings.port_range_start
+        end = settings.port_range_end
+        if start < 1 or end > 65535:
+            raise ServiceError(500, "Configured port range is out of bounds")
+        if end < start:
+            raise ServiceError(500, "Invalid port range configuration")
+        for port in range(start, end + 1):
+            if port not in used_ports:
+                return port
+        raise ServiceError(409, "No available ports in the configured range")
+
+    def _get_used_ports(self) -> set[int]:
+        used: set[int] = set()
+        try:
+            containers = docker_client.containers.list(all=True)
+        except DockerException as exc:
+            raise ServiceError(503, f"Docker unavailable: {exc}") from exc
+
+        for container in containers:
+            ports = container.attrs.get("NetworkSettings", {}).get("Ports") or {}
+            for bindings in ports.values():
+                if not bindings:
+                    continue
+                for binding in bindings:
+                    host_port = binding.get("HostPort")
+                    if host_port and host_port.isdigit():
+                        used.add(int(host_port))
+        return used
+
+    def _build_env(
+        self,
+        request: ServerCreateRequest,
+        memory_mb: int,
+        enable_rcon: bool,
+        rcon_password: Optional[str],
+        server_port: int,
+    ) -> Dict[str, str]:
+        env = dict(request.env)
+        env["EULA"] = "TRUE" if request.eula else "FALSE"
+        if request.version:
+            env["VERSION"] = request.version
+        if request.server_type:
+            env["TYPE"] = request.server_type.upper()
+        env["MEMORY"] = f"{memory_mb}M"
+        env["SERVER_PORT"] = str(server_port)
+        if enable_rcon:
+            env["ENABLE_RCON"] = "TRUE"
+            env["RCON_PASSWORD"] = rcon_password or ""
+        return env
+
+    def _resolve_rcon(self, request: ServerCreateRequest) -> tuple[bool, Optional[str]]:
+        if request.enable_rcon is None:
+            enable_rcon = settings.default_enable_rcon
+        else:
+            enable_rcon = request.enable_rcon
+        rcon_password = request.rcon_password or settings.default_rcon_password
+        if enable_rcon and not rcon_password:
+            rcon_password = uuid.uuid4().hex
+        return enable_rcon, rcon_password
+
+    def _is_rcon_enabled(self, container) -> bool:
+        labels = container.labels or {}
+        label_value = labels.get("mc.rcon_enabled")
+        if label_value is not None:
+            return label_value.lower() == "true"
+
+        env_list = container.attrs.get("Config", {}).get("Env") or []
+        env_map = {}
+        for item in env_list:
+            if "=" in item:
+                key, value = item.split("=", 1)
+                env_map[key] = value
+        return env_map.get("ENABLE_RCON", "").upper() == "TRUE"
+
+    def _is_modded(self, server_type: Optional[str]) -> bool:
+        if not server_type:
+            return False
+        return server_type.upper() in {"FORGE", "FABRIC"}
+
+    def _ensure_modded(self, container) -> None:
+        labels = container.labels or {}
+        modded_label = labels.get("mc.modded")
+        if modded_label is not None:
+            if modded_label.lower() == "true":
+                return
+        env_map = self._container_env_dict(container)
+        server_type = env_map.get("TYPE")
+        if server_type and self._is_modded(server_type):
+            return
+        raise ServiceError(409, "Mods require a Fabric or Forge server")
+
+    def _get_container_by_server_id(self, server_id: str):
+        try:
+            containers = docker_client.containers.list(
+                all=True,
+                filters={
+                    "label": [
+                        f"{settings.managed_label}={settings.managed_label_value}",
+                        f"mc.server_id={server_id}",
+                    ]
+                },
+            )
+        except DockerException as exc:
+            raise ServiceError(503, f"Docker unavailable: {exc}") from exc
+        if not containers:
+            raise ServiceError(404, "Server not found")
+        return containers[0]
+
+    def _get_local_dir(self, container, server_id: str) -> str:
+        labels = container.labels or {}
+        local_dir = labels.get("mc.server_dir_local")
+        if local_dir:
+            return local_dir
+        return self._server_dir(settings.data_root, server_id)
+
+    def _validate_local_dir(self, path: str) -> None:
+        root = os.path.realpath(settings.data_root)
+        target = os.path.realpath(path)
+        if not target.startswith(root + os.sep):
+            raise ServiceError(400, "Server data path is invalid")
+
+    def _read_server_properties(self, local_dir: str) -> Dict[str, str]:
+        path = os.path.join(local_dir, "server.properties")
+        if not os.path.exists(path):
+            return {}
+        properties: Dict[str, str] = {}
+        with open(path, "r", encoding="utf-8") as handle:
+            for line in handle:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#") or "=" not in stripped:
+                    continue
+                key, value = stripped.split("=", 1)
+                properties[key.strip()] = value.strip()
+        return properties
+
+    def _write_server_properties(self, local_dir: str, updates: Dict[str, str]) -> None:
+        path = os.path.join(local_dir, "server.properties")
+        os.makedirs(local_dir, exist_ok=True)
+        lines: list[str] = []
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as handle:
+                lines = handle.readlines()
+
+        remaining = dict(updates)
+        new_lines: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in line:
+                new_lines.append(line)
+                continue
+            key, _ = line.split("=", 1)
+            key = key.strip()
+            if key in remaining:
+                new_lines.append(f"{key}={remaining.pop(key)}\n")
+            else:
+                new_lines.append(line)
+
+        for key, value in remaining.items():
+            new_lines.append(f"{key}={value}\n")
+
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.writelines(new_lines)
+
+    def _properties_to_settings(self, properties: Dict[str, str]) -> ServerSettings:
+        payload: Dict[str, object] = {}
+        for field, prop_key in PROPERTY_MAP.items():
+            if prop_key not in properties:
+                continue
+            value = properties[prop_key]
+            if field in BOOL_FIELDS:
+                payload[field] = value.lower() == "true"
+            elif field in INT_FIELDS:
+                try:
+                    payload[field] = int(value)
+                except ValueError:
+                    pass
+            else:
+                payload[field] = value
+        return ServerSettings(**payload)
+
+    def _settings_to_properties(self, request: ServerSettings) -> Dict[str, str]:
+        updates: Dict[str, str] = {}
+        if hasattr(request, "model_dump"):
+            payload = request.model_dump(exclude_none=True)
+        else:
+            payload = request.dict(exclude_none=True)
+        for field, value in payload.items():
+            prop_key = PROPERTY_MAP.get(field)
+            if not prop_key:
+                continue
+            if field in BOOL_FIELDS:
+                updates[prop_key] = "true" if value else "false"
+            else:
+                updates[prop_key] = str(value)
+        return updates
+
+    def _exec_rcon(self, container, command: str) -> None:
+        try:
+            result = container.exec_run(["rcon-cli", command], stdout=True, stderr=True)
+        except DockerException as exc:
+            raise ServiceError(500, f"RCON command failed: {exc}") from exc
+
+        output = result.output.decode("utf-8", errors="replace") if result.output else ""
+        if result.exit_code != 0:
+            raise ServiceError(500, f"RCON command failed: {output.strip()}")
+
+    def _resolve_mod_version(self, request: ModInstallRequest) -> dict:
+        if request.version_id:
+            try:
+                return self.modrinth.get_version(request.version_id)
+            except ModrinthError:
+                raise
+
+        if not request.project_id:
+            raise ServiceError(400, "project_id is required")
+        try:
+            versions = self.modrinth.get_versions(
+                request.project_id, request.loader, request.game_version
+            )
+        except ModrinthError:
+            raise
+        if not versions:
+            raise ServiceError(404, "No compatible versions found")
+        return versions[0]
+
+    def _select_mod_file(self, version_data: dict) -> dict:
+        files = version_data.get("files") or []
+        if not files:
+            raise ServiceError(500, "Modrinth version has no files")
+        for file_info in files:
+            if file_info.get("primary"):
+                return file_info
+        return files[0]
+
+    def _download_file(self, url: str, dest_path: str) -> None:
+        import httpx
+
+        try:
+            with httpx.stream(
+                "GET",
+                url,
+                headers={"User-Agent": "TemptCraft/1.0"},
+                timeout=httpx.Timeout(30.0),
+            ) as response:
+                if response.status_code >= 400:
+                    raise ModrinthError(
+                        response.status_code,
+                        f"Modrinth download failed: {response.text}",
+                    )
+                with open(dest_path, "wb") as handle:
+                    for chunk in response.iter_bytes():
+                        handle.write(chunk)
+        except httpx.RequestError as exc:
+            raise ModrinthError(502, f"Mod download failed: {exc}") from exc
+
+    def _recreate_container_for_port(self, container, server_id: str, new_port: int) -> None:
+        current_container_port, current_host_port = self._get_primary_ports(container)
+        if current_host_port == new_port:
+            return
+
+        used_ports = self._get_used_ports()
+        if current_host_port in used_ports:
+            used_ports.remove(current_host_port)
+        if new_port in used_ports:
+            raise ServiceError(409, f"Port {new_port} is already in use")
+
+        labels = dict(container.labels or {})
+        host_dir = labels.get("mc.server_dir") or self._server_dir(settings.host_data_root, server_id)
+        if not host_dir:
+            raise ServiceError(500, "Missing server data path for container recreation")
+
+        env = self._container_env_dict(container)
+        env["SERVER_PORT"] = str(new_port)
+
+        memory_label = labels.get("mc.memory_mb")
+        if memory_label and memory_label.isdigit():
+            memory_mb = int(memory_label)
+        else:
+            memory_mb = settings.default_memory_mb
+
+        image_tag = container.image.tags[0] if container.image.tags else container.image.id
+        container_name = container.name
+
+        try:
+            if container.status == "running":
+                container.stop()
+            container.remove()
+            docker_client.containers.run(
+                image_tag,
+                name=container_name,
+                detach=True,
+                ports={f"{new_port}/tcp": new_port},
+                volumes={host_dir: {"bind": "/data", "mode": "rw"}},
+                environment=env,
+                labels=labels,
+                mem_limit=f"{memory_mb}m",
+            )
+        except DockerException as exc:
+            raise ServiceError(500, f"Failed to recreate container: {exc}") from exc
+
+    def _get_primary_ports(self, container) -> tuple[Optional[int], Optional[int]]:
+        ports = container.attrs.get("NetworkSettings", {}).get("Ports") or {}
+        for container_port, bindings in ports.items():
+            if not bindings:
+                continue
+            host_port_value = bindings[0].get("HostPort")
+            if host_port_value and host_port_value.isdigit():
+                container_port_num = container_port.split("/")[0]
+                if container_port_num.isdigit():
+                    return int(container_port_num), int(host_port_value)
+                return None, int(host_port_value)
+        return None, None
+
+    def _container_env_dict(self, container) -> Dict[str, str]:
+        env_list = container.attrs.get("Config", {}).get("Env") or []
+        env_map: Dict[str, str] = {}
+        for item in env_list:
+            if "=" in item:
+                key, value = item.split("=", 1)
+                env_map[key] = value
+        return env_map
+
+    def _container_to_info(self, container) -> ServerInfo:
+        labels = container.labels or {}
+        ports = container.attrs.get("NetworkSettings", {}).get("Ports") or {}
+        host_port = None
+        for bindings in ports.values():
+            if not bindings:
+                continue
+            host_port_value = bindings[0].get("HostPort")
+            if host_port_value and host_port_value.isdigit():
+                host_port = int(host_port_value)
+                break
+
+        image_tags = container.image.tags or []
+        image_tag = image_tags[0] if image_tags else None
+
+        version = labels.get("mc.version") or None
+        server_type = labels.get("mc.server_type") or None
+        modded_label = labels.get("mc.modded")
+        if modded_label is None:
+            modded = self._is_modded(server_type)
+        else:
+            modded = modded_label.lower() == "true"
+        memory_label = labels.get("mc.memory_mb")
+        memory_mb = int(memory_label) if memory_label and memory_label.isdigit() else None
+
+        return ServerInfo(
+            server_id=labels.get("mc.server_id", ""),
+            name=labels.get("mc.server_name", container.name),
+            status=container.status,
+            image=image_tag,
+            port=host_port,
+            container_id=container.id,
+            version=version,
+            server_type=server_type,
+            modded=modded,
+            memory_mb=memory_mb,
+        )
