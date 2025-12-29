@@ -121,3 +121,28 @@ class CommandResponse(BaseModel):
     server_id: str
     exit_code: int
     output: str
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=64)
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+class UserInfo(BaseModel):
+    id: int
+    username: str
+    role: str
+
+
+class AuthResponse(BaseModel):
+    user: UserInfo
+
+
+class UserCreateRequest(BaseModel):
+    username: str = Field(..., min_length=1, max_length=64)
+    password: str = Field(..., min_length=6, max_length=128)
+    role: str = Field(..., min_length=4, max_length=8)
+
+
+class UserListResponse(BaseModel):
+    users: list[UserInfo]

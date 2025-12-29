@@ -150,6 +150,11 @@ body {
   margin-top: 6px;
 }
 
+.sidebar-card .btn {
+  margin-top: 10px;
+  width: 100%;
+}
+
 .sidebar-footer {
   margin-top: auto;
   font-size: 12px;
@@ -588,6 +593,51 @@ body {
 
 .empty {
   color: var(--muted);
+}
+
+.login-page {
+  height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: min(420px, 92vw);
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: var(--border);
+  box-shadow: var(--shadow);
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-card h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.login-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.login-card input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  width: 100%;
+}
+
+.login-error {
+  color: var(--danger);
+  font-size: 13px;
+  min-height: 18px;
 }
 
 @media (max-width: 1200px) {

@@ -1,6 +1,10 @@
 const navItems = document.querySelectorAll(".nav-item");
 const views = document.querySelectorAll(".view");
 const themeBtn = document.getElementById("themeBtn");
+const navUsers = document.getElementById("navUsers");
+const userNameEl = document.getElementById("userName");
+const userRoleEl = document.getElementById("userRole");
+const logoutBtn = document.getElementById("logoutBtn");
 
 const serverListEl = document.getElementById("serverList");
 const emptyStateEl = document.getElementById("emptyState");
@@ -50,6 +54,12 @@ const logOutput = document.getElementById("logOutput");
 const commandInput = document.getElementById("commandInput");
 const sendCommandBtn = document.getElementById("sendCommandBtn");
 
+const userCreateForm = document.getElementById("userCreateForm");
+const newUserName = document.getElementById("newUserName");
+const newUserPassword = document.getElementById("newUserPassword");
+const newUserRole = document.getElementById("newUserRole");
+const userList = document.getElementById("userList");
+
 let servers = [];
 let activeServerId = null;
 let modVersionCache = {};
@@ -60,6 +70,7 @@ let liveLogsActive = false;
 let liveLogsServerId = null;
 let logBuffer = "";
 const MAX_LOG_CHARS = 200000;
+let currentUser = null;
 
 function toast(message, type = "") {
   const toastEl = document.getElementById("toast");
@@ -74,6 +85,10 @@ async function apiRequest(path, options = {}) {
     headers: { "Content-Type": "application/json" },
     ...options,
   });
+  if (response.status === 401) {
+    window.location = "/login";
+    throw new Error("Not authenticated");
+  }
   if (!response.ok) {
     let detail = "Request failed";
     try {
@@ -193,6 +208,103 @@ function setTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   themeBtn.textContent = theme === "dark" ? "Dark" : "Light";
   localStorage.setItem("tc-theme", theme);
+}
+
+async function loadCurrentUser() {
+  try {
+    const response = await apiRequest("/auth/me");
+    currentUser = response.user || null;
+    updateUserCard();
+    return !!currentUser;
+  } catch (err) {
+    currentUser = null;
+    return false;
+  }
+}
+
+function updateUserCard() {
+  if (!currentUser) {
+    userNameEl.textContent = "-";
+    userRoleEl.textContent = "-";
+    if (navUsers) navUsers.hidden = true;
+    return;
+  }
+  userNameEl.textContent = currentUser.username;
+  userRoleEl.textContent = currentUser.role;
+  if (navUsers) {
+    navUsers.hidden = currentUser.role !== "owner";
+  }
+}
+
+async function logout() {
+  try {
+    await apiRequest("/auth/logout", { method: "POST" });
+  } catch (err) {
+    // Ignore and force navigation.
+  }
+  window.location = "/login";
+}
+
+async function loadUsers() {
+  if (!currentUser || currentUser.role !== "owner") {
+    if (userList) {
+      userList.innerHTML = `<div class="list-item">Owner access required.</div>`;
+    }
+    return;
+  }
+  try {
+    const response = await apiRequest("/auth/users");
+    renderUsers(response.users || []);
+  } catch (err) {
+    if (userList) {
+      userList.innerHTML = `<div class="list-item">Unable to load users.</div>`;
+    }
+  }
+}
+
+function renderUsers(users) {
+  if (!userList) return;
+  userList.innerHTML = "";
+  if (!users.length) {
+    const empty = document.createElement("div");
+    empty.className = "list-item";
+    empty.textContent = "No users found";
+    userList.appendChild(empty);
+    return;
+  }
+  users.forEach((user) => {
+    const item = document.createElement("div");
+    item.className = "list-item";
+    item.innerHTML = `<div><strong>${user.username}</strong><br /><small>${user.role}</small></div>`;
+    userList.appendChild(item);
+  });
+}
+
+async function createUser(event) {
+  event.preventDefault();
+  if (!currentUser || currentUser.role !== "owner") {
+    toast("Owner access required", "error");
+    return;
+  }
+  const username = newUserName.value.trim();
+  const password = newUserPassword.value;
+  const role = newUserRole.value;
+  if (!username || !password) {
+    toast("Username and password required", "error");
+    return;
+  }
+  try {
+    await apiRequest("/auth/users", {
+      method: "POST",
+      body: JSON.stringify({ username, password, role }),
+    });
+    newUserName.value = "";
+    newUserPassword.value = "";
+    toast("User created", "success");
+    await loadUsers();
+  } catch (err) {
+    toast(err.message, "error");
+  }
 }
 
 function bindTabs(scopeId) {
@@ -1038,13 +1150,22 @@ async function sendCommand() {
 
 function bindEvents() {
   navItems.forEach((item) => {
-    item.addEventListener("click", () => showView(item.dataset.view));
+    item.addEventListener("click", () => {
+      showView(item.dataset.view);
+      if (item.dataset.view === "view-users") {
+        loadUsers();
+      }
+    });
   });
 
   themeBtn.addEventListener("click", () => {
     const current = document.documentElement.getAttribute("data-theme");
     setTheme(current === "dark" ? "light" : "dark");
   });
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", logout);
+  }
 
   refreshBtn.addEventListener("click", loadServers);
   newServerBtn.addEventListener("click", () => showView("view-create"));
@@ -1166,6 +1287,10 @@ function bindEvents() {
       sendCommand();
     }
   });
+
+  if (userCreateForm) {
+    userCreateForm.addEventListener("submit", createUser);
+  }
 }
 
 function bindTabGroups() {
@@ -1256,5 +1381,9 @@ window.addEventListener("DOMContentLoaded", () => {
   bindTabGroups();
   applySettingsDefaults();
   updateLiveButton();
-  loadServers();
+  loadCurrentUser().then((authenticated) => {
+    if (authenticated) {
+      loadServers();
+    }
+  });
 });

@@ -1,19 +1,32 @@
 import os
 from typing import Optional
 
-from fastapi import FastAPI, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi import FastAPI, Query, Request, Response
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 
+from .auth import AuthService, AuthUser
+from .config import settings
 from .models import (
+    AuthResponse,
     CommandRequest,
     CommandResponse,
+    LoginRequest,
     ServerActionResponse,
     ServerCreateRequest,
     ServerCreateResponse,
     ServerInfo,
     ServerSettings,
     ServerSettingsResponse,
+    UserCreateRequest,
+    UserInfo,
+    UserListResponse,
     WhitelistActionRequest,
     WhitelistResponse,
     ModInstallRequest,
@@ -28,14 +41,97 @@ from .services.modrinth_service import ModrinthError, ModrinthService
 app = FastAPI(title="Minecraft Docker Manager")
 modrinth = ModrinthService()
 service = MinecraftService(modrinth=modrinth)
+auth_service = AuthService()
 base_dir = os.path.dirname(os.path.abspath(__file__))
 static_dir = os.path.join(base_dir, "static")
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
+@app.on_event("startup")
+def startup() -> None:
+    auth_service.init_db()
+    auth_service.ensure_owner_bootstrap()
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/static") or path in {"/login", "/auth/login", "/auth/logout"}:
+        return await call_next(request)
+
+    user = auth_service.get_user_from_request(request)
+    if not user:
+        accepts = request.headers.get("accept", "")
+        if path == "/" or "text/html" in accepts:
+            return RedirectResponse("/login")
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+    request.state.user = user
+    return await call_next(request)
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(os.path.join(static_dir, "index.html"))
+
+
+@app.get("/login")
+def login_page() -> FileResponse:
+    return FileResponse(os.path.join(static_dir, "login.html"))
+
+
+@app.post("/auth/login", response_model=AuthResponse)
+def login(request: LoginRequest, response: Response) -> AuthResponse:
+    user = auth_service.authenticate(request.username, request.password)
+    if not user:
+        raise ServiceError(401, "Invalid credentials")
+    token, _ = auth_service.create_session(user.id)
+    max_age = settings.session_ttl_hours * 3600
+    response.set_cookie(
+        settings.auth_cookie_name,
+        token,
+        httponly=True,
+        samesite="lax",
+        secure=settings.auth_cookie_secure,
+        max_age=max_age,
+    )
+    return AuthResponse(user=UserInfo(id=user.id, username=user.username, role=user.role))
+
+
+@app.post("/auth/logout")
+def logout(request: Request, response: Response) -> JSONResponse:
+    token = request.cookies.get(settings.auth_cookie_name)
+    if token:
+        auth_service.delete_session(token)
+    response.delete_cookie(settings.auth_cookie_name)
+    return JSONResponse(content={"message": "logged out"})
+
+
+@app.get("/auth/me", response_model=AuthResponse)
+def me(request: Request) -> AuthResponse:
+    user = _require_user(request)
+    return AuthResponse(user=UserInfo(id=user.id, username=user.username, role=user.role))
+
+
+@app.get("/auth/users", response_model=UserListResponse)
+def list_users(request: Request) -> UserListResponse:
+    _require_owner(request)
+    users = auth_service.list_users()
+    return UserListResponse(
+        users=[UserInfo(id=user.id, username=user.username, role=user.role) for user in users]
+    )
+
+
+@app.post("/auth/users", response_model=UserInfo)
+def create_user(request: Request, payload: UserCreateRequest) -> UserInfo:
+    _require_owner(request)
+    role = payload.role.lower().strip()
+    if role != "admin":
+        raise ServiceError(400, "Only admin accounts can be created")
+    try:
+        user = auth_service.create_user(payload.username, payload.password, role="admin")
+    except ValueError as exc:
+        raise ServiceError(400, str(exc)) from exc
+    return UserInfo(id=user.id, username=user.username, role=user.role)
 
 
 @app.exception_handler(ServiceError)
@@ -46,6 +142,20 @@ def service_error_handler(request: Request, exc: ServiceError) -> JSONResponse:
 @app.exception_handler(ModrinthError)
 def modrinth_error_handler(request: Request, exc: ModrinthError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
+
+
+def _require_user(request: Request) -> AuthUser:
+    user = getattr(request.state, "user", None)
+    if not user:
+        raise ServiceError(401, "Not authenticated")
+    return user
+
+
+def _require_owner(request: Request) -> AuthUser:
+    user = _require_user(request)
+    if user.role != "owner":
+        raise ServiceError(403, "Owner permissions required")
+    return user
 
 
 @app.get("/servers", response_model=list[ServerInfo])

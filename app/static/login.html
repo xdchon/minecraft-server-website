@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MCServer Login</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="bg"></div>
+  <div class="login-page">
+    <div class="login-card">
+      <div class="logo">MCServer</div>
+      <h1>Sign in</h1>
+      <form id="loginForm" class="form">
+        <div class="field">
+          <label>Username</label>
+          <input id="loginUsername" type="text" autocomplete="username" required />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" required />
+        </div>
+        <div class="login-error" id="loginError"></div>
+        <button type="submit" class="btn primary">Sign in</button>
+      </form>
+    </div>
+  </div>
+  <script src="/static/login.js"></script>
+</body>
+</html>

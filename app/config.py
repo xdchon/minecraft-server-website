@@ -42,6 +42,13 @@ class Settings:
     default_rcon_password: str | None
     managed_label: str
     managed_label_value: str
+    auth_secret: str
+    auth_cookie_name: str
+    auth_cookie_secure: bool
+    session_ttl_hours: int
+    owner_username: str | None
+    owner_password: str | None
+    auth_db_path: str
 
 
 def load_settings() -> Settings:
@@ -61,6 +68,13 @@ def load_settings() -> Settings:
         default_rcon_password=os.getenv("DEFAULT_RCON_PASSWORD") or None,
         managed_label=os.getenv("MANAGED_LABEL", "mc.manager"),
         managed_label_value=os.getenv("MANAGED_LABEL_VALUE", "fastapi"),
+        auth_secret=os.getenv("AUTH_SECRET", ""),
+        auth_cookie_name=os.getenv("AUTH_COOKIE_NAME", "mcserver_session"),
+        auth_cookie_secure=_get_env_bool("AUTH_COOKIE_SECURE", False),
+        session_ttl_hours=_get_env_int("SESSION_TTL_HOURS", 24),
+        owner_username=os.getenv("OWNER_USERNAME") or None,
+        owner_password=os.getenv("OWNER_PASSWORD") or None,
+        auth_db_path=os.path.join(data_root, "_auth", "auth.db"),
     )
 
 
