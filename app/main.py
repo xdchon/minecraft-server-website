@@ -51,6 +51,7 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 def startup() -> None:
     auth_service.init_db()
     auth_service.ensure_owner_bootstrap()
+    service.start_dns_reconciler()
 
 
 @app.middleware("http")

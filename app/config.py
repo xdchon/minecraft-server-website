@@ -49,6 +49,13 @@ class Settings:
     owner_username: str | None
     owner_password: str | None
     auth_db_path: str
+    auto_dns_enabled: bool
+    mc_parent_domain: str
+    cf_api_token: str
+    cf_zone_id: str | None
+    cf_zone_name: str | None
+    dns_reconcile_interval_seconds: int
+
 
 
 def load_settings() -> Settings:
@@ -75,6 +82,12 @@ def load_settings() -> Settings:
         owner_username=os.getenv("OWNER_USERNAME") or None,
         owner_password=os.getenv("OWNER_PASSWORD") or None,
         auth_db_path=os.path.join(data_root, "_auth", "auth.db"),
+                auto_dns_enabled=_get_env_bool("AUTO_DNS_ENABLED", False),
+        mc_parent_domain=os.getenv("MC_PARENT_DOMAIN", "minecraft.johngov.co.uk"),
+        cf_api_token=os.getenv("CF_API_TOKEN", ""),
+        cf_zone_id=os.getenv("CF_ZONE_ID") or None,
+        cf_zone_name=os.getenv("CF_ZONE_NAME") or None,
+        dns_reconcile_interval_seconds=_get_env_int("DNS_RECONCILE_INTERVAL_SECONDS", 60),
     )
 
 

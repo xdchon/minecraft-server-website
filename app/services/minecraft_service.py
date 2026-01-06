@@ -5,6 +5,12 @@ import shutil
 import uuid
 from typing import Dict, Iterable, Optional
 
+import logging
+import threading
+import time
+from .cloudflare_dns import CloudflareDNS
+
+
 from docker.errors import DockerException
 
 from ..config import settings
@@ -99,9 +105,91 @@ INT_FIELDS = {
 }
 
 
+
 class MinecraftService:
     def __init__(self, modrinth: Optional[ModrinthService] = None) -> None:
         self.modrinth = modrinth or ModrinthService()
+        self.log = logging.getLogger("mc-manager")
+
+        self.dns = None
+        self._dns_thread_started = False
+        if settings.auto_dns_enabled:
+            # Fail fast if misconfigured, so you notice immediately in logs
+            self.dns = CloudflareDNS(
+                api_token=settings.cf_api_token,
+                zone_id=settings.cf_zone_id,
+                zone_name=settings.cf_zone_name,
+            )
+    def _sanitize_name(self, name: str) -> str:
+        cleaned = re.sub(r"[^a-zA-Z0-9-]+", "-", name).strip("-").lower()
+        return cleaned or "server"
+    def _server_fqdn(self, dns_name: str) -> str:
+        return f"{dns_name}.{settings.mc_parent_domain}".strip(".")
+
+    def _provision_dns_for(self, dns_name: str, port: int) -> None:
+        if not self.dns:
+            return
+        fqdn = self._server_fqdn(dns_name)
+        result = self.dns.upsert_minecraft_srv(fqdn, port)
+        self.log.info("DNS SRV %s: %s -> %s", result, fqdn, port)
+
+    def _remove_dns_for(self, dns_name: str) -> None:
+        if not self.dns:
+            return
+        fqdn = self._server_fqdn(dns_name)
+        deleted = self.dns.delete_minecraft_srv(fqdn)
+        self.log.info("DNS SRV deleted=%s for %s", deleted, fqdn)
+
+    def reconcile_dns_once(self) -> None:
+        """
+        Self-heal: for all managed containers, ensure SRV points at the right port.
+        """
+        if not self.dns:
+            return
+        try:
+            containers = docker_client.containers.list(
+                all=True,
+                filters={"label": f"{settings.managed_label}={settings.managed_label_value}"},
+            )
+        except DockerException as exc:
+            self.log.warning("DNS reconcile skipped: Docker unavailable: %s", exc)
+            return
+
+        for c in containers:
+            labels = c.labels or {}
+            dns_name = labels.get("mc.dns_name") or self._sanitize_name(labels.get("mc.server_name", c.name))
+
+            # Extract current host port
+            ports = c.attrs.get("NetworkSettings", {}).get("Ports") or {}
+            host_port = None
+            for bindings in ports.values():
+                if bindings and bindings[0].get("HostPort", "").isdigit():
+                    host_port = int(bindings[0]["HostPort"])
+                    break
+            if host_port is None:
+                continue
+
+            try:
+                self._provision_dns_for(dns_name, host_port)
+            except Exception as exc:
+                self.log.warning("DNS reconcile failed for %s:%s (%s)", dns_name, host_port, exc)
+
+    def start_dns_reconciler(self) -> None:
+        if not self.dns or self._dns_thread_started:
+            return
+        self._dns_thread_started = True
+
+        def loop() -> None:
+            while True:
+                try:
+                    self.reconcile_dns_once()
+                except Exception as exc:
+                    self.log.warning("DNS reconcile loop error: %s", exc)
+                time.sleep(settings.dns_reconcile_interval_seconds)
+
+        t = threading.Thread(target=loop, daemon=True, name="dns-reconciler")
+        t.start()
+        self.log.info("DNS reconciler started (interval=%ss)", settings.dns_reconcile_interval_seconds)
 
     def list_servers(self) -> list[ServerInfo]:
         try:
@@ -147,6 +235,8 @@ class MinecraftService:
                 request.version,
                 request.server_type.upper() if request.server_type else None,
             )
+            dns_name = safe_name
+            labels["mc.dns_name"] = dns_name
             env = self._build_env(request, memory_mb, enable_rcon, rcon_password, port)
             container = docker_client.containers.run(
                 settings.minecraft_image,
@@ -159,6 +249,15 @@ class MinecraftService:
                 mem_limit=f"{memory_mb}m",
             )
             container.reload()
+
+            # Auto-provision SRV DNS so players can join by hostname immediately
+            try:
+                self._provision_dns_for(dns_name, port)
+            except Exception as exc:
+                # Don’t require manual action: reconciler will retry automatically
+                self.log.warning(
+                    "DNS provision failed for %s:%s (%s). Will retry.", dns_name, port, exc
+                )
         except DockerException as exc:
             if container is not None:
                 try:
@@ -197,6 +296,15 @@ class MinecraftService:
 
     def delete_server(self, server_id: str, retain_data: bool) -> ServerActionResponse:
         container = self._get_container_by_server_id(server_id)
+        labels = container.labels or {}
+        dns_name = labels.get("mc.dns_name") or self._sanitize_name(
+            labels.get("mc.server_name", container.name)
+        )
+        try:
+            self._remove_dns_for(dns_name)
+        except Exception as exc:
+            self.log.warning("DNS delete failed for %s (%s).", dns_name, exc)
+
         local_dir = self._get_local_dir(container, server_id)
         try:
             container.remove(force=True)
