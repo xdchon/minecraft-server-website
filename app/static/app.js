@@ -28,7 +28,6 @@ const countStopped = document.getElementById("countStopped");
 
 const createForm = document.getElementById("createForm");
 const createMemory = document.getElementById("createMemory");
-const createMemoryValue = document.getElementById("createMemoryValue");
 
 const settingsForm = document.getElementById("settingsForm");
 const settingsServerBadge = document.getElementById("settingsServerBadge");
@@ -72,6 +71,7 @@ const brandingPreview = document.getElementById("brandingPreview");
 const brandingFile = document.getElementById("brandingFile");
 const brandingUploadBtn = document.getElementById("brandingUploadBtn");
 const brandingStatus = document.getElementById("brandingStatus");
+const defaultTitle = document.title;
 
 let servers = [];
 let activeServerId = null;
@@ -600,6 +600,7 @@ function setActiveServer(serverId) {
     activeServerName.textContent = "No server selected";
     activeServerMeta.textContent = "Select a server from the list.";
     settingsServerBadge.textContent = "No server";
+    document.title = defaultTitle;
     updateOverview(null);
     updateActionButtons(null);
     syncModFiltersWithServer();
@@ -619,6 +620,7 @@ function setActiveServer(serverId) {
   activeServerName.textContent = server.name;
   activeServerMeta.textContent = `${server.server_type || "VANILLA"} • ${server.version || "latest"}`;
   settingsServerBadge.textContent = server.name;
+  document.title = `${server.name} • ${defaultTitle}`;
   updateOverview(server);
   updateActionButtons(server);
   updateConsoleLabel();
@@ -780,16 +782,12 @@ function buildCreateEnv() {
   env.ALLOW_END = document.getElementById("createAllowEnd").checked ? "TRUE" : "FALSE";
   env.ENABLE_COMMAND_BLOCK = document.getElementById("createCommandBlocks").checked ? "TRUE" : "FALSE";
   env.ONLINE_MODE = document.getElementById("createOnlineMode").checked ? "TRUE" : "FALSE";
-  env.ALLOW_FLIGHT = document.getElementById("createAllowFlight").checked ? "TRUE" : "FALSE";
   env.SPAWN_ANIMALS = document.getElementById("createSpawnAnimals").checked ? "TRUE" : "FALSE";
   env.SPAWN_MONSTERS = document.getElementById("createSpawnMonsters").checked ? "TRUE" : "FALSE";
   env.SPAWN_NPCS = document.getElementById("createSpawnNpcs").checked ? "TRUE" : "FALSE";
-  env.BROADCAST_CONSOLE_TO_OPS = document.getElementById("createBroadcastConsole").checked ? "TRUE" : "FALSE";
-  env.BROADCAST_RCON_TO_OPS = document.getElementById("createBroadcastRcon").checked ? "TRUE" : "FALSE";
 
   env.MAX_PLAYERS = String(document.getElementById("createMaxPlayers").value);
   env.OP_PERMISSION_LEVEL = String(document.getElementById("createOpPermissionLevel").value);
-  env.PLAYER_IDLE_TIMEOUT = String(document.getElementById("createIdleTimeout").value);
   env.VIEW_DISTANCE = String(document.getElementById("createViewDistance").value);
   env.SIMULATION_DISTANCE = String(document.getElementById("createSimulationDistance").value);
   env.MAX_TICK_TIME = String(document.getElementById("createMaxTickTime").value);
@@ -799,14 +797,10 @@ function buildCreateEnv() {
   const motd = document.getElementById("createMotd").value.trim();
   const levelSeed = document.getElementById("createLevelSeed").value.trim();
   const levelType = document.getElementById("createLevelType").value.trim();
-  const resourcePack = document.getElementById("createResourcePack").value.trim();
-  const resourcePackSha1 = document.getElementById("createResourcePackSha1").value.trim();
 
   if (motd) env.MOTD = motd;
   if (levelSeed) env.LEVEL_SEED = levelSeed;
   if (levelType) env.LEVEL_TYPE = levelType;
-  if (resourcePack) env.RESOURCE_PACK = resourcePack;
-  if (resourcePackSha1) env.RESOURCE_PACK_SHA1 = resourcePackSha1;
 
   return env;
 }
@@ -818,10 +812,9 @@ async function createServer(event) {
   const name = document.getElementById("createName").value.trim();
   const version = document.getElementById("createVersion").value.trim();
   const serverType = document.getElementById("createType").value;
-  const memory = parseInt(document.getElementById("createMemory").value, 10);
+  const memoryGb = parseInt(document.getElementById("createMemory").value, 10);
+  const memory = Number.isFinite(memoryGb) ? memoryGb * 1024 : 2048;
   const eula = document.getElementById("createEula").checked;
-  const rconPassword = document.getElementById("createRconPassword").value.trim();
-  const enableRcon = document.getElementById("createEnableRcon").checked;
 
   if (!eula) {
     toast("EULA must be accepted", "error");
@@ -834,11 +827,10 @@ async function createServer(event) {
     server_type: serverType,
     env: buildCreateEnv(),
     eula,
-    enable_rcon: enableRcon,
+    enable_rcon: true,
   };
 
   if (version) payload.version = version;
-  if (rconPassword) payload.rcon_password = rconPassword;
 
   try {
     await apiRequest("/servers", {
@@ -847,8 +839,7 @@ async function createServer(event) {
     });
     toast("Server created", "success");
     createForm.reset();
-    createMemory.value = "2048";
-    createMemoryValue.textContent = "2048 MB";
+    createMemory.value = "2";
     await loadServers();
     showView("view-servers");
   } catch (err) {
@@ -874,18 +865,12 @@ function applySettingsDefaults() {
   settingsSpawnNpcs.checked = true;
   settingsMaxPlayers.value = "20";
   settingsOpPermissionLevel.value = "4";
-  settingsPlayerIdleTimeout.value = "0";
   settingsOnlineMode.checked = true;
-  settingsViewDistance.value = "10";
+  settingsViewDistance.value = "32";
   settingsSimulationDistance.value = "10";
   settingsMaxTickTime.value = "60000";
   settingsEntityBroadcastRange.value = "100";
   settingsMotd.value = "";
-  settingsAllowFlight.checked = false;
-  settingsBroadcastConsoleToOps.checked = true;
-  settingsBroadcastRconToOps.checked = true;
-  settingsResourcePack.value = "";
-  settingsResourcePackSha1.value = "";
 }
 
 async function loadSettings() {
@@ -909,18 +894,12 @@ async function loadSettings() {
     if (settings.spawn_npcs !== undefined) settingsSpawnNpcs.checked = settings.spawn_npcs;
     if (settings.max_players !== undefined) settingsMaxPlayers.value = settings.max_players ?? "";
     if (settings.op_permission_level !== undefined) settingsOpPermissionLevel.value = settings.op_permission_level ?? "";
-    if (settings.player_idle_timeout !== undefined) settingsPlayerIdleTimeout.value = settings.player_idle_timeout ?? "";
     if (settings.online_mode !== undefined) settingsOnlineMode.checked = settings.online_mode;
     if (settings.view_distance !== undefined) settingsViewDistance.value = settings.view_distance ?? "";
     if (settings.simulation_distance !== undefined) settingsSimulationDistance.value = settings.simulation_distance ?? "";
     if (settings.max_tick_time !== undefined) settingsMaxTickTime.value = settings.max_tick_time ?? "";
     if (settings.entity_broadcast_range_percentage !== undefined) settingsEntityBroadcastRange.value = settings.entity_broadcast_range_percentage ?? "";
     if (settings.motd !== undefined) settingsMotd.value = settings.motd || "";
-    if (settings.allow_flight !== undefined) settingsAllowFlight.checked = settings.allow_flight;
-    if (settings.broadcast_console_to_ops !== undefined) settingsBroadcastConsoleToOps.checked = settings.broadcast_console_to_ops;
-    if (settings.broadcast_rcon_to_ops !== undefined) settingsBroadcastRconToOps.checked = settings.broadcast_rcon_to_ops;
-    if (settings.resource_pack !== undefined) settingsResourcePack.value = settings.resource_pack || "";
-    if (settings.resource_pack_sha1 !== undefined) settingsResourcePackSha1.value = settings.resource_pack_sha1 || "";
   } catch (err) {
     toast(err.message, "error");
   }
@@ -941,17 +920,11 @@ function collectSettingsPayload() {
     spawn_monsters: settingsSpawnMonsters.checked,
     spawn_npcs: settingsSpawnNpcs.checked,
     online_mode: settingsOnlineMode.checked,
-    allow_flight: settingsAllowFlight.checked,
-    broadcast_console_to_ops: settingsBroadcastConsoleToOps.checked,
-    broadcast_rcon_to_ops: settingsBroadcastRconToOps.checked,
     motd: settingsMotd.value.trim(),
-    resource_pack: settingsResourcePack.value.trim(),
-    resource_pack_sha1: settingsResourcePackSha1.value.trim(),
   };
 
   if (settingsMaxPlayers.value !== "") payload.max_players = parseInt(settingsMaxPlayers.value, 10);
   if (settingsOpPermissionLevel.value !== "") payload.op_permission_level = parseInt(settingsOpPermissionLevel.value, 10);
-  if (settingsPlayerIdleTimeout.value !== "") payload.player_idle_timeout = parseInt(settingsPlayerIdleTimeout.value, 10);
   if (settingsViewDistance.value !== "") payload.view_distance = parseInt(settingsViewDistance.value, 10);
   if (settingsSimulationDistance.value !== "") payload.simulation_distance = parseInt(settingsSimulationDistance.value, 10);
   if (settingsMaxTickTime.value !== "") payload.max_tick_time = parseInt(settingsMaxTickTime.value, 10);
@@ -1567,10 +1540,6 @@ function bindEvents() {
     }
   });
 
-  createMemory.addEventListener("input", () => {
-    createMemoryValue.textContent = `${createMemory.value} MB`;
-  });
-
   createForm.addEventListener("submit", createServer);
   settingsForm.addEventListener("submit", saveSettings);
   if (modConfigFilter) {
@@ -1722,18 +1691,12 @@ function getSettingsInputs() {
     settingsSpawnNpcs: document.getElementById("settingsSpawnNpcs"),
     settingsMaxPlayers: document.getElementById("settingsMaxPlayers"),
     settingsOpPermissionLevel: document.getElementById("settingsOpPermissionLevel"),
-    settingsPlayerIdleTimeout: document.getElementById("settingsPlayerIdleTimeout"),
     settingsOnlineMode: document.getElementById("settingsOnlineMode"),
     settingsViewDistance: document.getElementById("settingsViewDistance"),
     settingsSimulationDistance: document.getElementById("settingsSimulationDistance"),
     settingsMaxTickTime: document.getElementById("settingsMaxTickTime"),
     settingsEntityBroadcastRange: document.getElementById("settingsEntityBroadcastRange"),
     settingsMotd: document.getElementById("settingsMotd"),
-    settingsAllowFlight: document.getElementById("settingsAllowFlight"),
-    settingsBroadcastConsoleToOps: document.getElementById("settingsBroadcastConsoleToOps"),
-    settingsBroadcastRconToOps: document.getElementById("settingsBroadcastRconToOps"),
-    settingsResourcePack: document.getElementById("settingsResourcePack"),
-    settingsResourcePackSha1: document.getElementById("settingsResourcePackSha1"),
   };
 }
 
@@ -1753,18 +1716,12 @@ const {
   settingsSpawnNpcs,
   settingsMaxPlayers,
   settingsOpPermissionLevel,
-  settingsPlayerIdleTimeout,
   settingsOnlineMode,
   settingsViewDistance,
   settingsSimulationDistance,
   settingsMaxTickTime,
   settingsEntityBroadcastRange,
   settingsMotd,
-  settingsAllowFlight,
-  settingsBroadcastConsoleToOps,
-  settingsBroadcastRconToOps,
-  settingsResourcePack,
-  settingsResourcePackSha1,
 } = getSettingsInputs();
 
 window.addEventListener("DOMContentLoaded", () => {

@@ -245,6 +245,8 @@ class MinecraftService:
 
         container = None
         try:
+            if request.port is not None:
+                raise ServiceError(400, "Server port is assigned automatically")
             port = self._select_port(None)
             labels = self._labels(
                 server_id,

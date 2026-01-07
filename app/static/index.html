@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MCServer Control Panel</title>
   <link id="faviconLink" rel="icon" type="image/png" href="/branding/favicon.png" />
+  <link rel="stylesheet" href="/static/minecraft-theme/css/minecraft.css" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
   <div class="bg"></div>
   <div class="layout">
-    <aside class="sidebar">
+    <aside class="sidebar panel-dark">
       <div class="brand">
         <img id="brandLogo" class="brand-logo" src="/branding/logo.png" alt="Logo" />
         <div class="brand-text">
@@ -43,7 +44,7 @@
     </aside>
 
     <main class="main">
-      <header class="topbar">
+      <header class="topbar panel-dark">
         <div class="active-server">
           <div class="label">Selected server</div>
           <div id="activeServerName" class="value">No server selected</div>
@@ -108,7 +109,6 @@
                 <button class="tab" data-tab="create-world" type="button">World</button>
                 <button class="tab" data-tab="create-access" type="button">Access</button>
                 <button class="tab" data-tab="create-performance" type="button">Performance</button>
-                <button class="tab" data-tab="create-misc" type="button">Misc</button>
               </div>
 
               <div class="tab-content active" data-tab-panel="create-essentials">
@@ -119,7 +119,17 @@
                   </div>
                   <div class="field">
                     <label>Minecraft version</label>
-                    <input id="createVersion" type="text" placeholder="1.20.4" />
+                    <select id="createVersion">
+                      <option value="" selected>Latest</option>
+                      <option value="1.21.4">1.21.4</option>
+                      <option value="1.21.3">1.21.3</option>
+                      <option value="1.21.2">1.21.2</option>
+                      <option value="1.21.1">1.21.1</option>
+                      <option value="1.21">1.21</option>
+                      <option value="1.20.6">1.20.6</option>
+                      <option value="1.20.4">1.20.4</option>
+                      <option value="1.20.1">1.20.1</option>
+                    </select>
                   </div>
                   <div class="field">
                     <label>Server type</label>
@@ -131,9 +141,19 @@
                     </select>
                   </div>
                   <div class="field">
-                    <label>Memory (MB)</label>
-                    <input id="createMemory" type="range" min="512" max="16384" step="256" value="2048" />
-                    <div id="createMemoryValue" class="hint">2048 MB</div>
+                    <label>Memory (GB)</label>
+                    <select id="createMemory">
+                      <option value="1">1 GB</option>
+                      <option value="2" selected>2 GB</option>
+                      <option value="3">3 GB</option>
+                      <option value="4">4 GB</option>
+                      <option value="5">5 GB</option>
+                      <option value="6">6 GB</option>
+                      <option value="8">8 GB</option>
+                      <option value="10">10 GB</option>
+                      <option value="12">12 GB</option>
+                      <option value="16">16 GB</option>
+                    </select>
                   </div>
                   <div class="field">
                     <label>Server port</label>
@@ -233,10 +253,6 @@
                       <option value="4" selected>4</option>
                     </select>
                   </div>
-                  <div class="field">
-                    <label>Idle timeout (minutes)</label>
-                    <input id="createIdleTimeout" type="number" min="0" max="999" value="0" />
-                  </div>
                   <label class="toggle">
                     <input id="createOnlineMode" type="checkbox" checked />
                     <span>Online mode (auth)</span>
@@ -248,7 +264,7 @@
                 <div class="form-grid">
                   <div class="field">
                     <label>View distance</label>
-                    <input id="createViewDistance" type="number" min="4" max="32" value="10" />
+                    <input id="createViewDistance" type="number" min="4" max="32" value="32" />
                   </div>
                   <div class="field">
                     <label>Simulation distance</label>
@@ -261,39 +277,6 @@
                   <div class="field">
                     <label>Entity broadcast range (%)</label>
                     <input id="createEntityBroadcastRange" type="number" min="10" max="500" value="100" />
-                  </div>
-                </div>
-              </div>
-
-              <div class="tab-content" data-tab-panel="create-misc">
-                <div class="form-grid">
-                  <label class="toggle">
-                    <input id="createEnableRcon" type="checkbox" checked />
-                    <span>Enable RCON</span>
-                  </label>
-                  <label class="toggle">
-                    <input id="createAllowFlight" type="checkbox" />
-                    <span>Allow flight</span>
-                  </label>
-                  <label class="toggle">
-                    <input id="createBroadcastConsole" type="checkbox" checked />
-                    <span>Broadcast console to ops</span>
-                  </label>
-                  <label class="toggle">
-                    <input id="createBroadcastRcon" type="checkbox" checked />
-                    <span>Broadcast RCON to ops</span>
-                  </label>
-                  <div class="field">
-                    <label>Resource pack URL</label>
-                    <input id="createResourcePack" type="text" placeholder="https://example.com/pack.zip" />
-                  </div>
-                  <div class="field">
-                    <label>Resource pack SHA1</label>
-                    <input id="createResourcePackSha1" type="text" placeholder="Optional hash" />
-                  </div>
-                  <div class="field">
-                    <label>RCON password (optional)</label>
-                    <input id="createRconPassword" type="text" placeholder="Leave blank to auto-generate" />
                   </div>
                 </div>
               </div>
@@ -331,7 +314,6 @@
               <button class="tab" data-tab="settings-world" type="button">World</button>
               <button class="tab" data-tab="settings-access" type="button">Access</button>
               <button class="tab" data-tab="settings-performance" type="button">Performance</button>
-              <button class="tab" data-tab="settings-misc" type="button">Misc</button>
               <button class="tab" data-tab="settings-modconfig" type="button">Mod Config</button>
               <button class="tab" data-tab="settings-danger" type="button">Danger</button>
             </div>
@@ -429,10 +411,6 @@
                       <option value="4">4</option>
                     </select>
                   </div>
-                  <div class="field">
-                    <label>Idle timeout (minutes)</label>
-                    <input id="settingsPlayerIdleTimeout" type="number" min="0" max="999" />
-                  </div>
                   <label class="toggle">
                     <input id="settingsOnlineMode" type="checkbox" />
                     <span>Online mode (auth)</span>
@@ -457,31 +435,6 @@
                   <div class="field">
                     <label>Entity broadcast range (%)</label>
                     <input id="settingsEntityBroadcastRange" type="number" min="10" max="500" />
-                  </div>
-                </div>
-              </div>
-
-              <div class="tab-content" data-tab-panel="settings-misc">
-                <div class="form-grid">
-                  <label class="toggle">
-                    <input id="settingsAllowFlight" type="checkbox" />
-                    <span>Allow flight</span>
-                  </label>
-                  <label class="toggle">
-                    <input id="settingsBroadcastConsoleToOps" type="checkbox" />
-                    <span>Broadcast console to ops</span>
-                  </label>
-                  <label class="toggle">
-                    <input id="settingsBroadcastRconToOps" type="checkbox" />
-                    <span>Broadcast RCON to ops</span>
-                  </label>
-                  <div class="field">
-                    <label>Resource pack URL</label>
-                    <input id="settingsResourcePack" type="text" />
-                  </div>
-                  <div class="field">
-                    <label>Resource pack SHA1</label>
-                    <input id="settingsResourcePackSha1" type="text" />
                   </div>
                 </div>
               </div>
