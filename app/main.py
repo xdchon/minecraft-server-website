@@ -40,6 +40,7 @@ from .models import (
     ModVersionResponse,
 )
 from .services.minecraft_service import MinecraftService, ServiceError
+from .services.metadata_service import MetadataService
 from .services.modrinth_service import ModrinthError, ModrinthService
 from .services.branding_service import (
     BrandingError,
@@ -52,6 +53,7 @@ from .services.branding_service import (
 app = FastAPI(title="Minecraft Docker Manager")
 modrinth = ModrinthService()
 service = MinecraftService(modrinth=modrinth)
+metadata = MetadataService()
 auth_service = AuthService()
 base_dir = os.path.dirname(os.path.abspath(__file__))
 static_dir = os.path.join(base_dir, "static")
@@ -342,6 +344,33 @@ def update_whitelist(
     server_id: str, request: WhitelistActionRequest
 ) -> WhitelistResponse:
     return service.update_whitelist(server_id, request)
+
+
+@app.get("/meta/minecraft/releases")
+def minecraft_releases() -> JSONResponse:
+    try:
+        versions = metadata.minecraft_release_versions()
+    except RuntimeError as exc:
+        raise ServiceError(502, str(exc)) from exc
+    return JSONResponse(content={"versions": versions})
+
+
+@app.get("/meta/fabric/game-versions")
+def fabric_game_versions() -> JSONResponse:
+    try:
+        versions = metadata.fabric_game_versions()
+    except RuntimeError as exc:
+        raise ServiceError(502, str(exc)) from exc
+    return JSONResponse(content={"versions": versions})
+
+
+@app.get("/meta/fabric/loaders")
+def fabric_loaders() -> JSONResponse:
+    try:
+        loaders = metadata.fabric_loader_versions()
+    except RuntimeError as exc:
+        raise ServiceError(502, str(exc)) from exc
+    return JSONResponse(content={"loaders": loaders})
 
 
 @app.get("/mods/search", response_model=ModSearchResponse)

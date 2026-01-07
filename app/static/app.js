@@ -27,6 +27,10 @@ const countRunning = document.getElementById("countRunning");
 const countStopped = document.getElementById("countStopped");
 
 const createForm = document.getElementById("createForm");
+const createVersion = document.getElementById("createVersion");
+const createType = document.getElementById("createType");
+const createFabricLoaderWrap = document.getElementById("createFabricLoaderWrap");
+const createFabricLoaderVersion = document.getElementById("createFabricLoaderVersion");
 const createMemory = document.getElementById("createMemory");
 const createMemoryValue = document.getElementById("createMemoryValue");
 const createMaxPlayers = document.getElementById("createMaxPlayers");
@@ -84,6 +88,7 @@ let activeServerId = null;
 let modVersionCache = {};
 let modSearchToken = 0;
 let lastModServerId = null;
+let modGameVersionOverrides = {};
 let liveLogsController = null;
 let liveLogsActive = false;
 let liveLogsServerId = null;
@@ -95,6 +100,9 @@ const pendingServerActions = {};
 let activeViewId = "view-servers";
 let activeSettingsTab = "settings-gameplay";
 let brandingVersion = "0";
+let minecraftReleaseVersions = [];
+let fabricGameVersions = [];
+let fabricLoaderVersions = [];
 
 let modConfigFiles = [];
 let modConfigSelectedPath = null;
@@ -877,24 +885,30 @@ function syncModFiltersWithServer() {
     rawVersion && rawVersion.toLowerCase() !== "latest" ? rawVersion : "";
   modLoader.value = isModded ? serverType : "fabric";
   modLoader.disabled = true;
-  modGameVersion.value = normalizedVersion;
-  modGameVersion.disabled = true;
 
   if (!isModded) {
+    modGameVersion.value = "";
+    modGameVersion.disabled = true;
     modSearchInput.disabled = true;
     modSearchBtn.disabled = true;
     modSearchResults.innerHTML = `<div class="list-item">Mods require a Fabric or Forge server.</div>`;
     return;
   }
-  if (!normalizedVersion) {
-    modSearchInput.disabled = true;
-    modSearchBtn.disabled = true;
-    modSearchResults.innerHTML = `<div class="list-item">Set a specific server version to filter compatible mods.</div>`;
-    return;
+
+  if (normalizedVersion) {
+    modGameVersion.value = normalizedVersion;
+    modGameVersion.disabled = true;
+  } else {
+    modGameVersion.value = modGameVersionOverrides[server.server_id] || "";
+    modGameVersion.disabled = false;
   }
 
   modSearchInput.disabled = false;
   modSearchBtn.disabled = false;
+
+  if (!normalizedVersion && !modGameVersion.value.trim() && !modSearchResults.firstElementChild) {
+    modSearchResults.innerHTML = `<div class="list-item">Tip: enter a Game version to filter compatible mods and enable installs.</div>`;
+  }
 }
 
 async function loadServers({ showLoading = true } = {}) {
@@ -971,13 +985,112 @@ function buildCreateEnv() {
   return env;
 }
 
+function populateSelectOptions(selectEl, options, { includeEmpty = false, emptyLabel = "Latest" } = {}) {
+  if (!selectEl) return;
+  const current = selectEl.value;
+  selectEl.innerHTML = "";
+
+  if (includeEmpty) {
+    const empty = document.createElement("option");
+    empty.value = "";
+    empty.textContent = emptyLabel;
+    selectEl.appendChild(empty);
+  }
+
+  (options || []).forEach((value) => {
+    if (!value) return;
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    selectEl.appendChild(option);
+  });
+
+  const hasCurrent = Array.from(selectEl.options).some((opt) => opt.value === current);
+  selectEl.value = hasCurrent ? current : includeEmpty ? "" : selectEl.value;
+}
+
+function populateFabricLoaderOptions(loaders) {
+  if (!createFabricLoaderVersion) return;
+  const current = createFabricLoaderVersion.value;
+  createFabricLoaderVersion.innerHTML = "";
+
+  const latest = document.createElement("option");
+  latest.value = "";
+  latest.textContent = "Latest (recommended)";
+  createFabricLoaderVersion.appendChild(latest);
+
+  (loaders || []).forEach((loader) => {
+    const version = loader && loader.version ? String(loader.version).trim() : "";
+    if (!version) return;
+    const option = document.createElement("option");
+    option.value = version;
+    option.textContent = loader.stable ? `${version} (stable)` : version;
+    createFabricLoaderVersion.appendChild(option);
+  });
+
+  const hasCurrent = Array.from(createFabricLoaderVersion.options).some((opt) => opt.value === current);
+  createFabricLoaderVersion.value = hasCurrent ? current : "";
+}
+
+function syncCreateTypeUi() {
+  if (!createType) return;
+  const type = createType.value;
+  const isFabric = type === "FABRIC";
+
+  if (createFabricLoaderWrap) createFabricLoaderWrap.hidden = !isFabric;
+  if (createFabricLoaderVersion) {
+    createFabricLoaderVersion.disabled = !isFabric;
+    if (!isFabric) createFabricLoaderVersion.value = "";
+  }
+
+  if (!createVersion) return;
+  if (isFabric && fabricGameVersions.length) {
+    populateSelectOptions(createVersion, fabricGameVersions, {
+      includeEmpty: true,
+      emptyLabel: "Latest",
+    });
+    return;
+  }
+  if (minecraftReleaseVersions.length) {
+    populateSelectOptions(createVersion, minecraftReleaseVersions, {
+      includeEmpty: true,
+      emptyLabel: "Latest",
+    });
+  }
+}
+
+async function loadVersionMetadata() {
+  const results = await Promise.allSettled([
+    apiRequest("/meta/minecraft/releases"),
+    apiRequest("/meta/fabric/game-versions"),
+    apiRequest("/meta/fabric/loaders"),
+  ]);
+
+  const mc = results[0].status === "fulfilled" ? results[0].value : null;
+  const fabricGames = results[1].status === "fulfilled" ? results[1].value : null;
+  const fabricLoaders = results[2].status === "fulfilled" ? results[2].value : null;
+
+  if (mc && Array.isArray(mc.versions)) {
+    minecraftReleaseVersions = mc.versions.map((v) => String(v)).filter(Boolean);
+  }
+  if (fabricGames && Array.isArray(fabricGames.versions)) {
+    fabricGameVersions = fabricGames.versions.map((v) => String(v)).filter(Boolean);
+  }
+  if (fabricLoaders && Array.isArray(fabricLoaders.loaders)) {
+    fabricLoaderVersions = fabricLoaders.loaders;
+    populateFabricLoaderOptions(fabricLoaderVersions);
+  }
+
+  syncCreateTypeUi();
+}
+
 async function createServer(event) {
   event.preventDefault();
   const submitBtn = createForm.querySelector('button[type="submit"]');
   setButtonLoading(submitBtn, true, "Creating…");
   const name = document.getElementById("createName").value.trim();
-  const version = document.getElementById("createVersion").value.trim();
-  const serverType = document.getElementById("createType").value;
+  const version = createVersion ? createVersion.value.trim() : "";
+  const serverType = createType ? createType.value : "VANILLA";
   const memoryGb = parseInt(document.getElementById("createMemory").value, 10);
   const memory = Number.isFinite(memoryGb) ? memoryGb * 1024 : 2048;
   const eula = document.getElementById("createEula").checked;
@@ -988,11 +1101,25 @@ async function createServer(event) {
     return;
   }
 
+  if ((serverType === "FABRIC" || serverType === "FORGE") && !version) {
+    toast("Pick a specific Minecraft version for Fabric/Forge servers (mods depend on it).", "error");
+    setButtonLoading(submitBtn, false);
+    return;
+  }
+
+  const env = buildCreateEnv();
+  if (serverType === "FABRIC" && createFabricLoaderVersion) {
+    const loaderVersion = createFabricLoaderVersion.value.trim();
+    if (loaderVersion) {
+      env.FABRIC_LOADER_VERSION = loaderVersion;
+    }
+  }
+
   const payload = {
     name,
     memory_mb: memory,
     server_type: serverType,
-    env: buildCreateEnv(),
+    env,
     eula,
     enable_rcon: true,
   };
@@ -1010,6 +1137,7 @@ async function createServer(event) {
     if (createMaxPlayers) createMaxPlayers.value = "20";
     updateCreateMemoryHint();
     updateCreateMaxPlayersHint();
+    syncCreateTypeUi();
     await loadServers();
     navigateToView("view-servers");
   } catch (err) {
@@ -1392,10 +1520,11 @@ function getModContext() {
   const rawVersion = (server.version || "").trim();
   const normalizedVersion =
     rawVersion && rawVersion.toLowerCase() !== "latest" ? rawVersion : "";
+  const selectedVersion = (modGameVersion ? modGameVersion.value.trim() : "") || normalizedVersion;
   return {
     server,
     loader,
-    version: normalizedVersion,
+    version: selectedVersion,
     isModded: !!loader,
   };
 }
@@ -1462,10 +1591,6 @@ async function searchMods() {
     toast("Mods require a Fabric or Forge server", "error");
     return;
   }
-  if (!context.version) {
-    toast("Server version not set. Create the server with a specific version to filter mods.", "error");
-    return;
-  }
   modSearchResults.innerHTML = "";
   try {
     const params = new URLSearchParams({
@@ -1473,6 +1598,9 @@ async function searchMods() {
       loader: context.loader,
       limit: "12",
     });
+    if (context.version) {
+      params.set("game_version", context.version);
+    }
     const token = ++modSearchToken;
     const response = await apiRequest(`/mods/search?${params.toString()}`);
     renderModResults(response.results || [], context, token);
@@ -1578,7 +1706,7 @@ async function installMod(projectId, versionId) {
     return;
   }
   if (!context.version) {
-    toast("Server version not set. Create the server with a specific version to install mods.", "error");
+    toast("Set the Game version filter (or create the server with a specific version) to install mods.", "error");
     return;
   }
   const restart = modRestart.value === "true";
@@ -1723,6 +1851,9 @@ function bindEvents() {
   });
 
   createForm.addEventListener("submit", createServer);
+  if (createType) {
+    createType.addEventListener("change", syncCreateTypeUi);
+  }
   settingsForm.addEventListener("submit", saveSettings);
 
   if (createMemory) {
@@ -1776,6 +1907,9 @@ function bindEvents() {
   });
   modGameVersion.addEventListener("input", () => {
     modVersionCache = {};
+    if (activeServerId) {
+      modGameVersionOverrides[activeServerId] = modGameVersion.value.trim();
+    }
   });
   modSearchBtn.addEventListener("click", searchMods);
   modSearchInput.addEventListener("keydown", (event) => {
@@ -1803,7 +1937,7 @@ function bindEvents() {
       return;
     }
     if (!context.version) {
-      toast("Server version not set. Create the server with a specific version to install mods.", "error");
+      toast("Set the Game version filter (or create the server with a specific version) to install mods.", "error");
       return;
     }
     if (action === "versions") {
@@ -1924,6 +2058,7 @@ window.addEventListener("DOMContentLoaded", () => {
   applySettingsDefaults();
   updateCreateMemoryHint();
   updateCreateMaxPlayersHint();
+  syncCreateTypeUi();
   updateLiveButton();
   updateNavAvailability();
   resetModConfigState();
@@ -1933,6 +2068,7 @@ window.addEventListener("DOMContentLoaded", () => {
   loadCurrentUser().then((authenticated) => {
     if (authenticated) {
       loadServers();
+      loadVersionMetadata();
     }
   });
 });

@@ -4,7 +4,7 @@ import re
 import shutil
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional
 
 import logging
 import threading
@@ -298,6 +298,8 @@ class MinecraftService:
         container = self._ensure_autopause_env(container, server_id)
         local_dir = self._get_local_dir(container, server_id)
         self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
         self._enforce_open_access(local_dir)
         self._apply_branding_icon(local_dir)
         try:
@@ -319,6 +321,8 @@ class MinecraftService:
         container = self._ensure_autopause_env(container, server_id)
         local_dir = self._get_local_dir(container, server_id)
         self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
         self._enforce_open_access(local_dir)
         self._apply_branding_icon(local_dir)
         try:
@@ -383,6 +387,8 @@ class MinecraftService:
         container = self._get_container_by_server_id(server_id)
         local_dir = self._get_local_dir(container, server_id)
         self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
         properties = self._read_server_properties(local_dir)
         settings_payload = self._properties_to_settings(properties)
         return ServerSettingsResponse(server_id=server_id, settings=settings_payload)
@@ -393,6 +399,8 @@ class MinecraftService:
         container = self._get_container_by_server_id(server_id)
         local_dir = self._get_local_dir(container, server_id)
         self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
 
         if request.server_port is not None:
             raise ServiceError(400, "Server port is managed automatically")
@@ -424,6 +432,8 @@ class MinecraftService:
         container = self._get_container_by_server_id(server_id)
         local_dir = self._get_local_dir(container, server_id)
         self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
         path = os.path.join(local_dir, "whitelist.json")
         names: list[str] = []
         if os.path.exists(path):
@@ -461,6 +471,8 @@ class MinecraftService:
         container = self._get_container_by_server_id(server_id)
         local_dir = self._get_local_dir(container, server_id)
         self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
         mods_dir = os.path.join(local_dir, "mods")
         if not os.path.exists(mods_dir):
             return ModListResponse(server_id=server_id, mods=[])
@@ -477,32 +489,49 @@ class MinecraftService:
         container = self._get_container_by_server_id(server_id)
         local_dir = self._get_local_dir(container, server_id)
         self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
         self._ensure_modded(container)
 
         try:
             version_data = self._resolve_mod_version(request)
-            file_info = self._select_mod_file(version_data)
+            versions = [version_data] + self._collect_required_dependencies(
+                version_data,
+                loader=request.loader,
+                game_version=request.game_version,
+                visited_version_ids=set(),
+                visited_project_ids={request.project_id},
+            )
         except ModrinthError as exc:
             raise ServiceError(exc.status_code, exc.message) from exc
-        filename = file_info.get("filename")
-        url = file_info.get("url")
-        if not filename or not url:
-            raise ServiceError(500, "Modrinth version is missing a file URL")
-        if not filename.lower().endswith(".jar"):
-            raise ServiceError(400, "Unsupported mod file type")
 
         mods_dir = os.path.join(local_dir, "mods")
         os.makedirs(mods_dir, exist_ok=True)
-        dest_path = os.path.join(mods_dir, filename)
-        if os.path.exists(dest_path):
-            raise ServiceError(409, "Mod already installed")
+        main_filename: str | None = None
+        for idx, entry in enumerate(versions):
+            file_info = self._select_mod_file(entry)
+            filename = file_info.get("filename")
+            url = file_info.get("url")
+            if not filename or not url:
+                raise ServiceError(500, "Modrinth version is missing a file URL")
+            if idx == 0:
+                main_filename = filename
+            if not filename.lower().endswith(".jar"):
+                raise ServiceError(400, f"Unsupported mod file type: {filename}")
 
-        try:
-            self._download_file(url, dest_path)
-        except ModrinthError as exc:
-            raise ServiceError(exc.status_code, exc.message) from exc
-        except OSError as exc:
-            raise ServiceError(500, f"Failed to save mod file: {exc}") from exc
+            dest_path = os.path.join(mods_dir, filename)
+            if os.path.exists(dest_path):
+                continue
+
+            try:
+                self._download_file(url, dest_path)
+            except ModrinthError as exc:
+                raise ServiceError(exc.status_code, exc.message) from exc
+            except OSError as exc:
+                raise ServiceError(500, f"Failed to save mod file: {exc}") from exc
+
+        if not main_filename:
+            raise ServiceError(500, "Unable to determine mod filename")
 
         if restart:
             try:
@@ -510,7 +539,7 @@ class MinecraftService:
             except DockerException as exc:
                 raise ServiceError(500, f"Failed to restart server: {exc}") from exc
 
-        return ModInstallResponse(server_id=server_id, filename=filename)
+        return ModInstallResponse(server_id=server_id, filename=main_filename)
 
     def remove_mod(
         self, server_id: str, filename: str, restart: bool
@@ -518,6 +547,8 @@ class MinecraftService:
         container = self._get_container_by_server_id(server_id)
         local_dir = self._get_local_dir(container, server_id)
         self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
         self._ensure_modded(container)
 
         safe_name = os.path.basename(filename)
@@ -545,6 +576,8 @@ class MinecraftService:
         container = self._get_container_by_server_id(server_id)
         local_dir = self._get_local_dir(container, server_id)
         self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
         self._ensure_modded(container)
 
         config_dir = os.path.join(local_dir, "config")
@@ -588,6 +621,8 @@ class MinecraftService:
         container = self._get_container_by_server_id(server_id)
         local_dir = self._get_local_dir(container, server_id)
         self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
         self._ensure_modded(container)
 
         config_dir = os.path.join(local_dir, "config")
@@ -626,6 +661,8 @@ class MinecraftService:
         container = self._get_container_by_server_id(server_id)
         local_dir = self._get_local_dir(container, server_id)
         self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
         self._ensure_modded(container)
 
         config_dir = os.path.join(local_dir, "config")
@@ -895,17 +932,61 @@ class MinecraftService:
         return containers[0]
 
     def _get_local_dir(self, container, server_id: str) -> str:
+        expected = self._server_dir(settings.data_root, server_id)
+        if os.path.isdir(expected):
+            return expected
+
         labels = container.labels or {}
         local_dir = labels.get("mc.server_dir_local")
-        if local_dir:
+        if local_dir and self._is_within_data_root(local_dir) and os.path.isdir(local_dir):
             return local_dir
-        return self._server_dir(settings.data_root, server_id)
+
+        return expected
 
     def _validate_local_dir(self, path: str) -> None:
         root = os.path.realpath(settings.data_root)
         target = os.path.realpath(path)
         if not target.startswith(root + os.sep):
             raise ServiceError(400, "Server data path is invalid")
+
+    def _is_within_data_root(self, path: str) -> bool:
+        root = os.path.realpath(settings.data_root)
+        target = os.path.realpath(path)
+        return target.startswith(root + os.sep)
+
+    def _require_local_dir_exists(self, path: str) -> None:
+        if os.path.isdir(path):
+            return
+        raise ServiceError(
+            500,
+            f"Server data directory is missing on this manager: {path}. "
+            "Check DATA_ROOT/HOST_DATA_ROOT and your docker-compose bind mount, then restart the manager.",
+        )
+
+    def _assert_data_mount_matches(self, container, server_id: str) -> None:
+        try:
+            container.reload()
+        except DockerException:
+            return
+
+        mounts = container.attrs.get("Mounts") or []
+        source = None
+        for mount in mounts:
+            if mount.get("Destination") == "/data":
+                source = mount.get("Source")
+                break
+        if not source:
+            return
+
+        expected = os.path.realpath(self._server_dir(settings.host_data_root, server_id))
+        actual = os.path.realpath(str(source))
+        if actual != expected:
+            raise ServiceError(
+                500,
+                "Server volume mount mismatch. "
+                f"Container has /data -> {actual}, but manager expects {expected}. "
+                "Fix HOST_DATA_ROOT (and the bind mount used by the manager), then recreate the server container.",
+            )
 
     def _resolve_mod_config_path(self, config_dir: str, file_path: str) -> str:
         raw = (file_path or "").strip().replace("\\", "/").lstrip("/")
@@ -1035,6 +1116,68 @@ class MinecraftService:
             if file_info.get("primary"):
                 return file_info
         return files[0]
+
+    def _collect_required_dependencies(
+        self,
+        version_data: dict,
+        loader: Optional[str],
+        game_version: Optional[str],
+        visited_version_ids: set[str],
+        visited_project_ids: set[str],
+    ) -> list[dict[str, Any]]:
+        dependencies = version_data.get("dependencies") or []
+        if not isinstance(dependencies, list):
+            return []
+
+        collected: list[dict[str, Any]] = []
+        for dep in dependencies:
+            if not isinstance(dep, dict):
+                continue
+            dep_type = str(dep.get("dependency_type") or "").lower()
+            if dep_type != "required":
+                continue
+
+            dep_version_data: dict[str, Any] | None = None
+            raw_version_id = dep.get("version_id")
+            raw_project_id = dep.get("project_id")
+
+            if isinstance(raw_version_id, str) and raw_version_id.strip():
+                version_id = raw_version_id.strip()
+                if version_id in visited_version_ids:
+                    continue
+                visited_version_ids.add(version_id)
+                dep_version_data = self.modrinth.get_version(version_id)
+            elif isinstance(raw_project_id, str) and raw_project_id.strip():
+                project_id = raw_project_id.strip()
+                if project_id in visited_project_ids:
+                    continue
+                visited_project_ids.add(project_id)
+                versions = self.modrinth.get_versions(project_id, loader, game_version)
+                if not versions:
+                    raise ServiceError(
+                        404, f"No compatible versions found for required dependency: {project_id}"
+                    )
+                dep_version_data = versions[0]
+                resolved_version_id = dep_version_data.get("id")
+                if isinstance(resolved_version_id, str) and resolved_version_id.strip():
+                    visited_version_ids.add(resolved_version_id.strip())
+            else:
+                continue
+
+            if not isinstance(dep_version_data, dict):
+                continue
+            collected.append(dep_version_data)
+            collected.extend(
+                self._collect_required_dependencies(
+                    dep_version_data,
+                    loader=loader,
+                    game_version=game_version,
+                    visited_version_ids=visited_version_ids,
+                    visited_project_ids=visited_project_ids,
+                )
+            )
+
+        return collected
 
     def _download_file(self, url: str, dest_path: str) -> None:
         import httpx

@@ -6,9 +6,7 @@ services:
       - "8000:8000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${HOST_DATA_ROOT}:/data/minecraft
+      - ${HOST_DATA_ROOT}:${DATA_ROOT}
     env_file:
       - .env
-    environment:
-      DATA_ROOT: /data/minecraft
     restart: unless-stopped
