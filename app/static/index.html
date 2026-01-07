@@ -9,7 +9,10 @@
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <div class="bg"></div>
+  <div class="bg" id="bg">
+    <div class="bg-layer bg-layer-a"></div>
+    <div class="bg-layer bg-layer-b"></div>
+  </div>
   <div class="layout">
     <aside class="sidebar panel-dark">
       <div class="brand">
@@ -40,7 +43,6 @@
         <div class="sidebar-metric" id="countRunning">0 running</div>
         <div class="sidebar-metric" id="countStopped">0 stopped</div>
       </div>
-      <div class="sidebar-footer">Inspired by Aternos / Exaroton</div>
     </aside>
 
     <main class="main">
@@ -142,22 +144,11 @@
                   </div>
                   <div class="field">
                     <label>Memory (GB)</label>
-                    <select id="createMemory">
-                      <option value="1">1 GB</option>
-                      <option value="2" selected>2 GB</option>
-                      <option value="3">3 GB</option>
-                      <option value="4">4 GB</option>
-                      <option value="5">5 GB</option>
-                      <option value="6">6 GB</option>
-                      <option value="8">8 GB</option>
-                      <option value="10">10 GB</option>
-                      <option value="12">12 GB</option>
-                      <option value="16">16 GB</option>
-                    </select>
-                  </div>
-                  <div class="field">
-                    <label>Server port</label>
-                    <div class="hint">Assigned automatically.</div>
+                    <div class="mc-slider-wrap">
+                      <input id="createMemory" class="mc-slider" type="range" min="1" max="9" step="1" value="2" />
+                      <div class="mc-slider-thumb" aria-hidden="true"></div>
+                    </div>
+                    <div id="createMemoryValue" class="hint">2 GB (2048 MB)</div>
                   </div>
                   <div class="field">
                     <label>Message of the day</label>
@@ -242,7 +233,11 @@
                 <div class="form-grid">
                   <div class="field">
                     <label>Max players</label>
-                    <input id="createMaxPlayers" type="number" min="1" max="200" value="20" />
+                    <div class="mc-slider-wrap">
+                      <input id="createMaxPlayers" class="mc-slider" type="range" min="1" max="50" step="1" value="20" />
+                      <div class="mc-slider-thumb" aria-hidden="true"></div>
+                    </div>
+                    <div id="createMaxPlayersValue" class="hint">20</div>
                   </div>
                   <div class="field">
                     <label>OP permission level</label>
@@ -400,7 +395,11 @@
                 <div class="form-grid">
                   <div class="field">
                     <label>Max players</label>
-                    <input id="settingsMaxPlayers" type="number" min="1" max="200" />
+                    <div class="mc-slider-wrap">
+                      <input id="settingsMaxPlayers" class="mc-slider" type="range" min="1" max="50" step="1" value="20" />
+                      <div class="mc-slider-thumb" aria-hidden="true"></div>
+                    </div>
+                    <div id="settingsMaxPlayersValue" class="hint">20</div>
                   </div>
                   <div class="field">
                     <label>OP permission level</label>
@@ -646,6 +645,7 @@
   </div>
 
   <div id="toast" class="toast"></div>
+  <script src="/static/background.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

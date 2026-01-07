@@ -10,6 +10,7 @@ from fastapi.responses import (
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from .auth import AuthService, AuthUser
 from .config import settings
@@ -80,6 +81,8 @@ async def auth_middleware(request: Request, call_next):
         return await call_next(request)
     if path.startswith("/branding") and request.method == "GET":
         return await call_next(request)
+    if path == "/theme/backgrounds" and request.method == "GET":
+        return await call_next(request)
 
     user = auth_service.get_user_from_request(request)
     if not user:
@@ -95,10 +98,34 @@ async def auth_middleware(request: Request, call_next):
 def index() -> FileResponse:
     return FileResponse(os.path.join(static_dir, "index.html"))
 
+@app.get("/panel")
+def panel_root() -> FileResponse:
+    return index()
+
+
+@app.get("/panel/{path:path}")
+def panel_page(path: str) -> FileResponse:
+    return index()
+
 
 @app.get("/login")
 def login_page() -> FileResponse:
     return FileResponse(os.path.join(static_dir, "login.html"))
+
+@app.get("/theme/backgrounds")
+def theme_backgrounds() -> JSONResponse:
+    background_dir = Path(theme_dir) / "imgs" / "background"
+    urls: list[str] = []
+    if background_dir.exists():
+        for path in sorted(background_dir.iterdir()):
+            if not path.is_file():
+                continue
+            if path.name.startswith("."):
+                continue
+            if path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
+                continue
+            urls.append(f"/imgs/background/{path.name}")
+    return JSONResponse(content={"urls": urls})
 
 
 @app.post("/auth/login", response_model=AuthResponse)

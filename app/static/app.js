@@ -28,6 +28,9 @@ const countStopped = document.getElementById("countStopped");
 
 const createForm = document.getElementById("createForm");
 const createMemory = document.getElementById("createMemory");
+const createMemoryValue = document.getElementById("createMemoryValue");
+const createMaxPlayers = document.getElementById("createMaxPlayers");
+const createMaxPlayersValue = document.getElementById("createMaxPlayersValue");
 
 const settingsForm = document.getElementById("settingsForm");
 const settingsServerBadge = document.getElementById("settingsServerBadge");
@@ -72,6 +75,9 @@ const brandingFile = document.getElementById("brandingFile");
 const brandingUploadBtn = document.getElementById("brandingUploadBtn");
 const brandingStatus = document.getElementById("brandingStatus");
 const defaultTitle = document.title;
+const settingsMaxPlayersValue = document.getElementById("settingsMaxPlayersValue");
+
+const PANEL_BASE_PATH = "/panel";
 
 let servers = [];
 let activeServerId = null;
@@ -119,6 +125,156 @@ function toast(message, type = "") {
   toastEl.className = `toast ${type}`.trim();
   requestAnimationFrame(() => toastEl.classList.add("show"));
   setTimeout(() => toastEl.classList.remove("show"), 3200);
+}
+
+function clampNumber(value, min, max) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, n));
+}
+
+function updateSliderUi(rangeInput) {
+  if (!rangeInput) return;
+  const wrap = rangeInput.closest(".mc-slider-wrap");
+  if (!wrap) return;
+  const min = Number(rangeInput.min || 0);
+  const max = Number(rangeInput.max || 100);
+  const value = Number(rangeInput.value);
+  const percent = max === min ? 0 : (value - min) / (max - min);
+  wrap.style.setProperty("--mc-slider-percent", String(clampNumber(percent, 0, 1)));
+}
+
+function updateCreateMemoryHint() {
+  if (!createMemory || !createMemoryValue) return;
+  const gb = clampNumber(parseInt(createMemory.value, 10), 1, 9);
+  createMemoryValue.textContent = `${gb} GB (${gb * 1024} MB)`;
+  updateSliderUi(createMemory);
+}
+
+function updateCreateMaxPlayersHint() {
+  if (!createMaxPlayers || !createMaxPlayersValue) return;
+  const min = parseInt(createMaxPlayers.min || "1", 10);
+  const max = parseInt(createMaxPlayers.max || "50", 10);
+  const players = clampNumber(parseInt(createMaxPlayers.value, 10), min, max);
+  createMaxPlayersValue.textContent = String(players);
+  updateSliderUi(createMaxPlayers);
+}
+
+function updateSettingsMaxPlayersHint({ loadedValue = null } = {}) {
+  if (!settingsMaxPlayers || !settingsMaxPlayersValue) return;
+  const min = parseInt(settingsMaxPlayers.min || "1", 10);
+  const max = parseInt(settingsMaxPlayers.max || "50", 10);
+  const current = clampNumber(parseInt(settingsMaxPlayers.value, 10), min, max);
+  const loaded = loadedValue === null ? null : parseInt(String(loadedValue), 10);
+  if (loaded !== null && Number.isFinite(loaded) && loaded !== current) {
+    settingsMaxPlayersValue.textContent = `${current} (server: ${loaded})`;
+    updateSliderUi(settingsMaxPlayers);
+    return;
+  }
+  settingsMaxPlayersValue.textContent = String(current);
+  updateSliderUi(settingsMaxPlayers);
+}
+
+function viewRequiresServer(viewId) {
+  return viewId === "view-settings" || viewId === "view-mods" || viewId === "view-console";
+}
+
+function routeForView(viewId, serverId) {
+  if (viewId === "view-create") return `${PANEL_BASE_PATH}/create`;
+  if (viewId === "view-branding") return `${PANEL_BASE_PATH}/branding`;
+  if (viewId === "view-users") return `${PANEL_BASE_PATH}/users`;
+  if (viewId === "view-settings") return `${PANEL_BASE_PATH}/server/${serverId}/settings`;
+  if (viewId === "view-mods") return `${PANEL_BASE_PATH}/server/${serverId}/mods`;
+  if (viewId === "view-console") return `${PANEL_BASE_PATH}/server/${serverId}/console`;
+  return `${PANEL_BASE_PATH}/servers`;
+}
+
+function parsePanelRoute(pathname) {
+  const raw = (pathname || "/").split("?")[0];
+  const normalized = raw.replace(/\/+$/, "") || "/";
+
+  if (normalized === "/" || normalized === PANEL_BASE_PATH) {
+    return { viewId: "view-servers", serverId: null };
+  }
+
+  if (!normalized.startsWith(PANEL_BASE_PATH + "/")) {
+    return { viewId: "view-servers", serverId: null };
+  }
+
+  const parts = normalized
+    .slice(PANEL_BASE_PATH.length)
+    .split("/")
+    .filter(Boolean);
+
+  if (!parts.length || parts[0] === "servers") {
+    return { viewId: "view-servers", serverId: null };
+  }
+  if (parts[0] === "create") return { viewId: "view-create", serverId: null };
+  if (parts[0] === "branding") return { viewId: "view-branding", serverId: null };
+  if (parts[0] === "users") return { viewId: "view-users", serverId: null };
+
+  if (parts[0] === "server" && parts.length >= 3) {
+    const serverId = parts[1];
+    const section = parts[2];
+    if (section === "settings") return { viewId: "view-settings", serverId };
+    if (section === "mods") return { viewId: "view-mods", serverId };
+    if (section === "console") return { viewId: "view-console", serverId };
+  }
+
+  return { viewId: "view-servers", serverId: null };
+}
+
+function navigateToView(viewId, { replace = false, serverId = null } = {}) {
+  let resolvedServerId = serverId || activeServerId || null;
+
+  if (viewRequiresServer(viewId) && !resolvedServerId) {
+    toast("Select a server first", "error");
+    viewId = "view-servers";
+  }
+
+  if (viewRequiresServer(viewId) && !resolvedServerId) {
+    resolvedServerId = null;
+  }
+
+  const path = routeForView(viewId, resolvedServerId || "unknown");
+  const method = replace ? "replaceState" : "pushState";
+  history[method]({ viewId, serverId: resolvedServerId }, "", path);
+  applyRouteFromLocation();
+}
+
+function applyRouteFromLocation() {
+  const route = parsePanelRoute(window.location.pathname);
+  const viewId = route.viewId;
+
+  if (!window.location.pathname.startsWith(PANEL_BASE_PATH)) {
+    const canonical = routeForView(viewId, route.serverId || activeServerId || "unknown");
+    history.replaceState(route, "", canonical);
+  }
+
+  if (viewRequiresServer(viewId)) {
+    const desiredServerId = route.serverId || activeServerId;
+    if (!desiredServerId) {
+      history.replaceState(null, "", routeForView("view-servers"));
+      showView("view-servers");
+      return;
+    }
+
+    if (servers.length) {
+      const exists = servers.some((s) => s.server_id === desiredServerId);
+      if (!exists) {
+        toast("Server not found", "error");
+        setActiveServer(null);
+        history.replaceState(null, "", routeForView("view-servers"));
+        showView("view-servers");
+        return;
+      }
+      if (desiredServerId !== activeServerId) {
+        setActiveServer(desiredServerId);
+      }
+    }
+  }
+
+  showView(viewId);
 }
 
 async function apiRequest(path, options = {}) {
@@ -248,6 +404,9 @@ function showView(viewId) {
   if (viewId === "view-mods") {
     syncModFiltersWithServer();
     loadMods();
+  }
+  if (viewId === "view-users") {
+    loadUsers();
   }
   if (viewId === "view-console") {
     updateConsoleLabel();
@@ -750,6 +909,10 @@ async function loadServers({ showLoading = true } = {}) {
     renderServers();
     let desiredServerId = activeServerId;
     if (!desiredServerId) {
+      const route = parsePanelRoute(window.location.pathname);
+      if (route.serverId) desiredServerId = route.serverId;
+    }
+    if (!desiredServerId) {
       try {
         desiredServerId = localStorage.getItem("tc-active-server");
       } catch (err) {
@@ -760,6 +923,9 @@ async function loadServers({ showLoading = true } = {}) {
       setActiveServer(desiredServerId);
     } else {
       setActiveServer(null);
+      if (viewRequiresServer(activeViewId)) {
+        navigateToView("view-servers", { replace: true });
+      }
     }
   } catch (err) {
     toast(err.message, "error");
@@ -818,6 +984,7 @@ async function createServer(event) {
 
   if (!eula) {
     toast("EULA must be accepted", "error");
+    setButtonLoading(submitBtn, false);
     return;
   }
 
@@ -840,8 +1007,11 @@ async function createServer(event) {
     toast("Server created", "success");
     createForm.reset();
     createMemory.value = "2";
+    if (createMaxPlayers) createMaxPlayers.value = "20";
+    updateCreateMemoryHint();
+    updateCreateMaxPlayersHint();
     await loadServers();
-    showView("view-servers");
+    navigateToView("view-servers");
   } catch (err) {
     toast(err.message, "error");
   } finally {
@@ -864,6 +1034,7 @@ function applySettingsDefaults() {
   settingsSpawnMonsters.checked = true;
   settingsSpawnNpcs.checked = true;
   settingsMaxPlayers.value = "20";
+  updateSettingsMaxPlayersHint();
   settingsOpPermissionLevel.value = "4";
   settingsOnlineMode.checked = true;
   settingsViewDistance.value = "32";
@@ -892,7 +1063,21 @@ async function loadSettings() {
     if (settings.spawn_animals !== undefined) settingsSpawnAnimals.checked = settings.spawn_animals;
     if (settings.spawn_monsters !== undefined) settingsSpawnMonsters.checked = settings.spawn_monsters;
     if (settings.spawn_npcs !== undefined) settingsSpawnNpcs.checked = settings.spawn_npcs;
-    if (settings.max_players !== undefined) settingsMaxPlayers.value = settings.max_players ?? "";
+    if (settings.max_players !== undefined) {
+      const loaded = parseInt(String(settings.max_players ?? ""), 10);
+      if (Number.isFinite(loaded)) {
+        const min = parseInt(settingsMaxPlayers.min || "1", 10);
+        const max = parseInt(settingsMaxPlayers.max || "50", 10);
+        const clamped = clampNumber(loaded, min, max);
+        settingsMaxPlayers.value = String(clamped);
+        updateSettingsMaxPlayersHint({ loadedValue: loaded });
+      } else {
+        settingsMaxPlayers.value = "";
+        updateSettingsMaxPlayersHint();
+      }
+    } else {
+      updateSettingsMaxPlayersHint();
+    }
     if (settings.op_permission_level !== undefined) settingsOpPermissionLevel.value = settings.op_permission_level ?? "";
     if (settings.online_mode !== undefined) settingsOnlineMode.checked = settings.online_mode;
     if (settings.view_distance !== undefined) settingsViewDistance.value = settings.view_distance ?? "";
@@ -1500,16 +1685,13 @@ function bindEvents() {
   navItems.forEach((item) => {
     item.addEventListener("click", () => {
       const viewId = item.dataset.view;
-      const requiresServer = viewId === "view-settings" || viewId === "view-mods" || viewId === "view-console";
-      if (requiresServer && !activeServerId) {
+      if (!viewId) return;
+      if (viewRequiresServer(viewId) && !activeServerId) {
         toast("Select a server first", "error");
-        showView("view-servers");
+        navigateToView("view-servers", { replace: true });
         return;
       }
-      showView(viewId);
-      if (viewId === "view-users") {
-        loadUsers();
-      }
+      navigateToView(viewId);
     });
   });
 
@@ -1518,7 +1700,7 @@ function bindEvents() {
   }
 
   refreshBtn.addEventListener("click", loadServers);
-  newServerBtn.addEventListener("click", () => showView("view-create"));
+  newServerBtn.addEventListener("click", () => navigateToView("view-create"));
   startBtn.addEventListener("click", () => sendServerAction("start"));
   stopBtn.addEventListener("click", () => sendServerAction("stop"));
   restartBtn.addEventListener("click", () => sendServerAction("restart"));
@@ -1542,6 +1724,17 @@ function bindEvents() {
 
   createForm.addEventListener("submit", createServer);
   settingsForm.addEventListener("submit", saveSettings);
+
+  if (createMemory) {
+    createMemory.addEventListener("input", updateCreateMemoryHint);
+  }
+  if (createMaxPlayers) {
+    createMaxPlayers.addEventListener("input", updateCreateMaxPlayersHint);
+  }
+  if (settingsMaxPlayers) {
+    settingsMaxPlayers.addEventListener("input", () => updateSettingsMaxPlayersHint());
+  }
+
   if (modConfigFilter) {
     modConfigFilter.addEventListener("input", () => {
       renderModConfigList();
@@ -1729,10 +1922,14 @@ window.addEventListener("DOMContentLoaded", () => {
   bindEvents();
   bindTabGroups();
   applySettingsDefaults();
+  updateCreateMemoryHint();
+  updateCreateMaxPlayersHint();
   updateLiveButton();
   updateNavAvailability();
   resetModConfigState();
   updateConsoleLabel();
+  window.addEventListener("popstate", applyRouteFromLocation);
+  applyRouteFromLocation();
   loadCurrentUser().then((authenticated) => {
     if (authenticated) {
       loadServers();

@@ -45,14 +45,39 @@ body {
 .bg {
   position: fixed;
   inset: 0;
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.88)),
+  background-image: linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.88)),
     url("/imgs/blocks/dirt.png");
   background-repeat: repeat;
-  background-size: var(--block-size);
+  background-size: cover, var(--block-size);
   image-rendering: pixelated;
   pointer-events: none;
   z-index: 0;
+}
+
+.bg-rotator {
+  background-image: none;
+}
+
+.bg-layer {
+  position: absolute;
+  inset: -2%;
+  opacity: 0;
+  background-image: linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.88)), var(--bg-image, none);
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  will-change: transform, opacity;
+  image-rendering: pixelated;
+}
+
+@keyframes bg-kenburns {
+  from {
+    transform: translate3d(var(--bg-from-x, 0%), var(--bg-from-y, 0%), 0) scale(var(--bg-from-scale, 1.04));
+  }
+
+  to {
+    transform: translate3d(var(--bg-to-x, 0%), var(--bg-to-y, 0%), 0) scale(var(--bg-to-scale, 1.1));
+  }
 }
 
 .layout {
@@ -228,6 +253,26 @@ body {
 
 .view.active {
   display: block;
+  animation: view-enter 160ms ease-out;
+  will-change: transform, opacity;
+}
+
+@keyframes view-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view.active {
+    animation: none;
+  }
 }
 
 .panel-grid {
@@ -309,15 +354,18 @@ body {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
-  padding: 0.5rem 1rem;
-  font-size: 1.125rem;
-  line-height: 1.75rem;
+  padding: 8px 16px;
+  font-size: 18px;
+  line-height: 28px;
+  min-height: 52px;
   outline: none;
 }
 
 .btn:hover,
 .nav-item:hover,
 .tab:hover {
+  background-image: url("/imgs/ui/button-inside-hover.png");
+  border-image: url("/imgs/ui/button-border-hover.png");
   color: var(--mc-gold);
 }
 
@@ -348,6 +396,7 @@ body {
   padding: 0.35rem 0.75rem;
   font-size: 0.95rem;
   line-height: 1.25rem;
+  min-height: 40px;
 }
 
 .btn.primary {
@@ -619,7 +668,7 @@ body {
   text-shadow: var(--mc-shadow);
 }
 
-.field input,
+.field input:not([type="range"]),
 .field select,
 .mod-config-actions select,
 .console-top select,
@@ -637,8 +686,8 @@ body {
   background: transparent;
   padding: 10px 12px;
   color: var(--mc-text);
-  font-family: Monocraft, Minecraft, system-ui, sans-serif;
-  text-shadow: none;
+  font-family: Minecraft, system-ui, sans-serif;
+  text-shadow: var(--mc-shadow);
   outline: none;
 }
 
@@ -674,10 +723,10 @@ body {
 .console-top select option {
   background-color: #141414;
   color: var(--mc-text);
-  font-family: Monocraft, Minecraft, system-ui, sans-serif;
+  font-family: Minecraft, system-ui, sans-serif;
 }
 
-.field input:focus,
+.field input:not([type="range"]):focus,
 .field select:focus,
 .mod-config-actions select:focus,
 .console-top select:focus,
@@ -973,8 +1022,10 @@ body {
 
 .login-page {
   height: 100vh;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   padding: 24px;
   position: relative;
   z-index: 1;
@@ -986,6 +1037,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.login-banner {
+  width: min(980px, 96vw);
+  height: auto;
+  margin: 0 auto 6px;
+  display: block;
+  image-rendering: pixelated;
 }
 
 .login-card h1 {
@@ -1108,4 +1167,61 @@ body {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+.mc-slider {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.mc-slider-wrap {
+  --mc-slider-height: 37px;
+  --mc-slider-thumb: 37px;
+  --mc-slider-border: 2px;
+  --mc-slider-percent: 0;
+  position: relative;
+  width: 100%;
+  height: var(--mc-slider-height);
+  background-image: url("/imgs/ui/button-inside-active.png");
+  background-size: 100% 100%;
+  background-repeat: repeat;
+  border: var(--mc-slider-border) solid #000;
+  box-sizing: border-box;
+  overflow: hidden;
+  image-rendering: pixelated;
+}
+
+.mc-slider-wrap:focus-within {
+  box-shadow: inset 0 0 0 1px var(--mc-slider-focus);
+}
+
+.mc-slider-wrap .mc-slider {
+  position: absolute;
+  inset: 0;
+}
+
+.mc-slider-thumb {
+  position: absolute;
+  top: 0;
+  left: calc(var(--mc-slider-percent) * (100% - var(--mc-slider-thumb)));
+  width: var(--mc-slider-thumb);
+  height: 100%;
+  background-image: url("/imgs/ui/slider.jpg");
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  box-sizing: border-box;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.mc-slider-wrap .mc-slider:focus-visible + .mc-slider-thumb {
+  outline: 2px solid rgba(254, 240, 138, 0.65);
+  outline-offset: -2px;
 }
