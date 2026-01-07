@@ -136,6 +136,8 @@ body {
 .nav-item {
   width: 100%;
   text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-card {
@@ -288,6 +290,8 @@ body {
 .nav-item,
 .tab {
   --zoom: 10;
+  margin: 0;
+  text-transform: none;
   border-style: solid;
   border-color: transparent;
   border-width: calc(var(--block-size) / var(--zoom));
@@ -304,16 +308,16 @@ body {
   text-shadow: var(--mc-shadow);
   cursor: pointer;
   user-select: none;
-  padding: 10px 14px;
-  line-height: 1;
+  white-space: nowrap;
+  padding: 0.5rem 1rem;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
   outline: none;
 }
 
 .btn:hover,
 .nav-item:hover,
 .tab:hover {
-  background-image: url("/imgs/ui/button-inside-hover.png");
-  border-image: url("/imgs/ui/button-border-hover.png");
   color: var(--mc-gold);
 }
 
@@ -341,8 +345,9 @@ body {
 }
 
 .btn.small {
-  padding: 8px 10px;
-  font-size: 12px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.25rem;
 }
 
 .btn.primary {
@@ -583,8 +588,9 @@ body {
 }
 
 .tab {
-  font-size: 12px;
-  padding: 8px 12px;
+  font-size: 0.95rem;
+  line-height: 1.25rem;
+  padding: 0.35rem 0.75rem;
 }
 
 .tab-content {
@@ -989,10 +995,22 @@ body {
 }
 
 .login-card .field input {
+  --zoom: 24;
+  border-width: calc(var(--block-size) / var(--zoom));
+  border-image: url("/imgs/ui/enchanting-slot.png");
+  border-image-width: calc(var(--block-size) / var(--zoom));
+  border-image-slice: 33.5% 33.5% fill;
+  border-image-repeat: stretch;
+  height: var(--block-size);
+  line-height: calc(var(--block-size) / 2);
+  padding: 0 12px;
   background-color: rgba(0, 0, 0, 0.35);
+  border-radius: 6px;
+  clip-path: inset(0 round 6px);
 }
 
 .login-card .field input:focus {
+  border-image: url("/imgs/ui/enchanting-slot-active.png");
   background-color: rgba(0, 0, 0, 0.25);
 }
 
