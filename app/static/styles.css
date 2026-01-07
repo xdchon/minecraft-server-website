@@ -13,6 +13,23 @@
   box-sizing: border-box;
 }
 
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+button::-moz-focus-inner {
+  border: 0;
+  padding: 0;
+}
+
 html,
 body {
   height: 100%;
@@ -30,7 +47,7 @@ body {
   inset: 0;
   background-image:
     linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.88)),
-    url("minecraft-theme/imgs/blocks/dirt.png");
+    url("/imgs/blocks/dirt.png");
   background-repeat: repeat;
   background-size: var(--block-size);
   image-rendering: pixelated;
@@ -55,6 +72,7 @@ body {
 .panel-dark {
   border-style: solid;
   background-color: transparent;
+  border-color: transparent;
 }
 
 .sidebar {
@@ -83,7 +101,7 @@ body {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/slot.png");
+  border-image: url("/imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -125,7 +143,8 @@ body {
   --zoom: 10;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/transparent-panel.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/transparent-panel.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 43% 43% fill;
   border-image-repeat: stretch;
@@ -258,7 +277,8 @@ body {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/raised-slot.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/raised-slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -269,13 +289,14 @@ body {
 .tab {
   --zoom: 10;
   border-style: solid;
+  border-color: transparent;
   border-width: calc(var(--block-size) / var(--zoom));
-  border-image: url("minecraft-theme/imgs/ui/button-border.png");
+  border-image: url("/imgs/ui/button-border.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 10% 3%;
   border-image-repeat: stretch;
   background-size: cover;
-  background-image: url("minecraft-theme/imgs/ui/button-inside.png");
+  background-image: url("/imgs/ui/button-inside.png");
   background-color: transparent;
   image-rendering: pixelated;
   color: #d1d5db;
@@ -285,28 +306,37 @@ body {
   user-select: none;
   padding: 10px 14px;
   line-height: 1;
+  outline: none;
 }
 
 .btn:hover,
 .nav-item:hover,
 .tab:hover {
-  background-image: url("minecraft-theme/imgs/ui/button-inside-hover.png");
-  border-image: url("minecraft-theme/imgs/ui/button-border-hover.png");
+  background-image: url("/imgs/ui/button-inside-hover.png");
+  border-image: url("/imgs/ui/button-border-hover.png");
   color: var(--mc-gold);
 }
 
 .btn:active,
 .nav-item:active,
 .tab:active {
-  background-image: url("minecraft-theme/imgs/ui/button-inside-active.png");
-  border-image: url("minecraft-theme/imgs/ui/button-border-active.png");
+  background-image: url("/imgs/ui/button-inside-active.png");
+  border-image: url("/imgs/ui/button-border-active.png");
   color: #a8a29e;
+}
+
+.btn:focus-visible,
+.nav-item:focus-visible,
+.tab:focus-visible {
+  background-image: url("/imgs/ui/button-inside-hover.png");
+  border-image: url("/imgs/ui/button-border-hover.png");
+  color: var(--mc-gold);
 }
 
 .nav-item.active,
 .tab.active {
-  background-image: url("minecraft-theme/imgs/ui/button-inside-active.png");
-  border-image: url("minecraft-theme/imgs/ui/button-border-active.png");
+  background-image: url("/imgs/ui/button-inside-active.png");
+  border-image: url("/imgs/ui/button-border-active.png");
   color: var(--mc-gold);
 }
 
@@ -370,18 +400,20 @@ body {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/raised-slot.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/raised-slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
+  outline: none;
 }
 
 .server-card:hover {
-  border-image: url("minecraft-theme/imgs/ui/raised-slot-hover.png");
+  border-image: url("/imgs/ui/raised-slot-hover.png");
 }
 
 .server-card.active {
-  border-image: url("minecraft-theme/imgs/ui/raised-slot-active.png");
+  border-image: url("/imgs/ui/raised-slot-active.png");
 }
 
 .server-card.skeleton {
@@ -453,7 +485,8 @@ body {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/slot.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -514,7 +547,8 @@ body {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/slot.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -589,7 +623,8 @@ body {
   --zoom: 16;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/anvil-textbox.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/anvil-textbox.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 40% 40% fill;
   border-image-repeat: stretch;
@@ -601,13 +636,48 @@ body {
   outline: none;
 }
 
+.field select,
+.mod-config-actions select,
+.console-top select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 42px;
+  background-image: url("/imgs/icons/arrow-down.png");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+  image-rendering: pixelated;
+  cursor: pointer;
+}
+
+.field select:hover,
+.mod-config-actions select:hover,
+.console-top select:hover {
+  background-image: url("/imgs/icons/arrow-down-hover.png");
+}
+
+.field select:focus,
+.mod-config-actions select:focus,
+.console-top select:focus {
+  background-image: url("/imgs/icons/arrow-down-hover.png");
+}
+
+.field select option,
+.mod-config-actions select option,
+.console-top select option {
+  background-color: #141414;
+  color: var(--mc-text);
+  font-family: Monocraft, Minecraft, system-ui, sans-serif;
+}
+
 .field input:focus,
 .field select:focus,
 .mod-config-actions select:focus,
 .console-top select:focus,
 .console-command input:focus,
 .login-card input:focus {
-  border-image: url("minecraft-theme/imgs/ui/anvil-textbox-active.png");
+  border-image: url("/imgs/ui/anvil-textbox-active.png");
 }
 
 .console-label {
@@ -624,7 +694,8 @@ body {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/raised-slot.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/raised-slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -633,7 +704,7 @@ body {
 }
 
 .toggle:hover {
-  border-image: url("minecraft-theme/imgs/ui/raised-slot-hover.png");
+  border-image: url("/imgs/ui/raised-slot-hover.png");
 }
 
 .toggle input {
@@ -685,14 +756,15 @@ body {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/slot.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
 }
 
 .list-item.active {
-  border-image: url("minecraft-theme/imgs/ui/raised-slot-active.png");
+  border-image: url("/imgs/ui/raised-slot-active.png");
 }
 
 .list-item.disabled {
@@ -715,7 +787,8 @@ body {
   --zoom: 10;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/achievement-panel.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/achievement-panel.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 45.5% 45.5% fill;
   border-image-repeat: stretch;
@@ -741,7 +814,8 @@ body {
   --zoom: 10;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/panel.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/panel.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 43% 43% fill;
   border-image-repeat: stretch;
@@ -755,7 +829,8 @@ body {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/slot.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -791,7 +866,8 @@ body {
   --zoom: 10;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/panel-dark.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/panel-dark.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 43% 43% fill;
   border-image-repeat: stretch;
@@ -839,7 +915,8 @@ body {
   --zoom: 10;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/panel-dark.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/panel-dark.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 43% 43% fill;
   border-image-repeat: stretch;
@@ -868,7 +945,8 @@ body {
   --zoom: 10;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/achievement-panel.png");
+  border-color: transparent;
+  border-image: url("/imgs/ui/achievement-panel.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 45.5% 45.5% fill;
   border-image-repeat: stretch;
@@ -934,7 +1012,7 @@ body {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/scroll-thumb.png");
+  border-image: url("/imgs/ui/scroll-thumb.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -946,7 +1024,7 @@ body {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/scroll-thumb-active.png");
+  border-image: url("/imgs/ui/scroll-thumb-active.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -958,7 +1036,7 @@ body {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("minecraft-theme/imgs/ui/slot.png");
+  border-image: url("/imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;

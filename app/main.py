@@ -55,6 +55,10 @@ auth_service = AuthService()
 base_dir = os.path.dirname(os.path.abspath(__file__))
 static_dir = os.path.join(base_dir, "static")
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
+theme_dir = os.path.join(static_dir, "minecraft-theme")
+app.mount("/css", StaticFiles(directory=os.path.join(theme_dir, "css")), name="theme-css")
+app.mount("/fonts", StaticFiles(directory=os.path.join(theme_dir, "fonts")), name="theme-fonts")
+app.mount("/imgs", StaticFiles(directory=os.path.join(theme_dir, "imgs")), name="theme-imgs")
 
 
 @app.on_event("startup")
@@ -68,7 +72,11 @@ def startup() -> None:
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
-    if path.startswith("/static") or path in {"/login", "/auth/login", "/auth/logout"}:
+    if path.startswith(("/static", "/css", "/fonts", "/imgs")) or path in {
+        "/login",
+        "/auth/login",
+        "/auth/logout",
+    }:
         return await call_next(request)
     if path.startswith("/branding") and request.method == "GET":
         return await call_next(request)
