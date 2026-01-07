@@ -1,7 +1,9 @@
 const navItems = document.querySelectorAll(".nav-item");
 const views = document.querySelectorAll(".view");
-const themeBtn = document.getElementById("themeBtn");
 const navUsers = document.getElementById("navUsers");
+const navBranding = document.getElementById("navBranding");
+const faviconLink = document.getElementById("faviconLink");
+const brandLogo = document.getElementById("brandLogo");
 const userNameEl = document.getElementById("userName");
 const userRoleEl = document.getElementById("userRole");
 const logoutBtn = document.getElementById("logoutBtn");
@@ -31,12 +33,18 @@ const createMemoryValue = document.getElementById("createMemoryValue");
 const settingsForm = document.getElementById("settingsForm");
 const settingsServerBadge = document.getElementById("settingsServerBadge");
 const settingsRestart = document.getElementById("settingsRestart");
-const whitelistName = document.getElementById("whitelistName");
-const whitelistAddBtn = document.getElementById("whitelistAddBtn");
-const whitelistList = document.getElementById("whitelistList");
 const deleteKeepData = document.getElementById("deleteKeepData");
 const deleteConfirm = document.getElementById("deleteConfirm");
 const deleteServerBtn = document.getElementById("deleteServerBtn");
+
+const modConfigFilter = document.getElementById("modConfigFilter");
+const modConfigList = document.getElementById("modConfigList");
+const modConfigPath = document.getElementById("modConfigPath");
+const modConfigRestart = document.getElementById("modConfigRestart");
+const modConfigReloadBtn = document.getElementById("modConfigReloadBtn");
+const modConfigSaveBtn = document.getElementById("modConfigSaveBtn");
+const modConfigEditor = document.getElementById("modConfigEditor");
+const modConfigStatus = document.getElementById("modConfigStatus");
 
 const modSearchInput = document.getElementById("modSearchInput");
 const modLoader = document.getElementById("modLoader");
@@ -46,7 +54,7 @@ const modSearchBtn = document.getElementById("modSearchBtn");
 const modSearchResults = document.getElementById("modSearchResults");
 const installedMods = document.getElementById("installedMods");
 
-const consoleSelect = document.getElementById("consoleServerSelect");
+const consoleServerLabel = document.getElementById("consoleServerLabel");
 const liveLogsBtn = document.getElementById("liveLogsBtn");
 const fetchLogsBtn = document.getElementById("fetchLogsBtn");
 const clearLogsBtn = document.getElementById("clearLogsBtn");
@@ -60,6 +68,11 @@ const newUserPassword = document.getElementById("newUserPassword");
 const newUserRole = document.getElementById("newUserRole");
 const userList = document.getElementById("userList");
 
+const brandingPreview = document.getElementById("brandingPreview");
+const brandingFile = document.getElementById("brandingFile");
+const brandingUploadBtn = document.getElementById("brandingUploadBtn");
+const brandingStatus = document.getElementById("brandingStatus");
+
 let servers = [];
 let activeServerId = null;
 let modVersionCache = {};
@@ -71,6 +84,34 @@ let liveLogsServerId = null;
 let logBuffer = "";
 const MAX_LOG_CHARS = 200000;
 let currentUser = null;
+let isLoadingServers = false;
+const pendingServerActions = {};
+let activeViewId = "view-servers";
+let activeSettingsTab = "settings-gameplay";
+let brandingVersion = "0";
+
+let modConfigFiles = [];
+let modConfigSelectedPath = null;
+let modConfigLoadedForServerId = null;
+let modConfigDirty = false;
+let modConfigLoading = false;
+let modConfigListMessage = "";
+
+function capitalize(value) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : "";
+}
+
+function encodePathSegments(path) {
+  return String(path || "")
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+}
+
+function brandingAssetUrl(filename) {
+  const suffix = brandingVersion ? `?v=${encodeURIComponent(brandingVersion)}` : "";
+  return `/branding/${filename}${suffix}`;
+}
 
 function toast(message, type = "") {
   const toastEl = document.getElementById("toast");
@@ -109,6 +150,90 @@ async function apiRequest(path, options = {}) {
   return response.text();
 }
 
+async function apiUpload(path, formData) {
+  const response = await fetch(path, {
+    method: "POST",
+    body: formData,
+  });
+  if (response.status === 401) {
+    window.location = "/login";
+    throw new Error("Not authenticated");
+  }
+  if (!response.ok) {
+    let detail = "Request failed";
+    try {
+      const data = await response.json();
+      detail = data.detail || detail;
+    } catch (err) {
+      detail = await response.text();
+    }
+    throw new Error(detail);
+  }
+  return response.json();
+}
+
+function applyBrandingAssets() {
+  const logoUrl = brandingAssetUrl("logo.png");
+  const faviconUrl = brandingAssetUrl("favicon.png");
+  if (brandLogo) brandLogo.src = logoUrl;
+  if (brandingPreview) brandingPreview.src = logoUrl;
+  if (faviconLink) faviconLink.href = faviconUrl;
+}
+
+async function loadBrandingVersion() {
+  try {
+    const response = await apiRequest("/branding/version");
+    brandingVersion = String(response.version || "0");
+  } catch (err) {
+    brandingVersion = "0";
+  } finally {
+    applyBrandingAssets();
+  }
+}
+
+function setButtonLoading(button, isLoading, label) {
+  if (!button) return;
+  if (isLoading) {
+    button.dataset.originalText = button.textContent;
+    button.textContent = label || "Working…";
+    button.disabled = true;
+    button.classList.add("loading");
+    return;
+  }
+  const original = button.dataset.originalText;
+  if (original) button.textContent = original;
+  button.disabled = false;
+  button.classList.remove("loading");
+}
+
+function setPendingAction(serverId, action) {
+  if (!serverId) return;
+  pendingServerActions[serverId] = { action, startedAt: Date.now() };
+  renderServers();
+  updateOverview(getActiveServer());
+  updateActionButtons(getActiveServer());
+  updateConsoleLabel();
+}
+
+function clearPendingAction(serverId) {
+  if (!serverId) return;
+  delete pendingServerActions[serverId];
+  renderServers();
+  updateOverview(getActiveServer());
+  updateActionButtons(getActiveServer());
+  updateConsoleLabel();
+}
+
+function getDisplayedServerStatus(server) {
+  const pending = pendingServerActions[server.server_id];
+  if (!pending) return server.status;
+  if (pending.action === "start") return "starting";
+  if (pending.action === "stop") return "stopping";
+  if (pending.action === "restart") return "restarting";
+  if (pending.action === "delete") return "deleting";
+  return "working";
+}
+
 function showView(viewId) {
   views.forEach((view) => view.classList.remove("active"));
   navItems.forEach((item) => item.classList.remove("active"));
@@ -116,7 +241,18 @@ function showView(viewId) {
   if (view) view.classList.add("active");
   const nav = Array.from(navItems).find((item) => item.dataset.view === viewId);
   if (nav) nav.classList.add("active");
-  if (viewId !== "view-console") {
+  activeViewId = viewId;
+  if (viewId === "view-settings") {
+    loadSettings();
+  }
+  if (viewId === "view-mods") {
+    syncModFiltersWithServer();
+    loadMods();
+  }
+  if (viewId === "view-console") {
+    updateConsoleLabel();
+    startLiveLogs();
+  } else {
     stopLiveLogs();
   }
 }
@@ -143,9 +279,10 @@ function appendLog(text) {
 }
 
 async function startLiveLogs() {
-  const serverId = consoleSelect.value;
+  const serverId = activeServerId;
   if (!serverId) {
-    toast("Select a server first", "error");
+    resetLogBuffer("Select a server to view logs.\n");
+    updateLiveButton();
     return;
   }
   if (liveLogsActive && liveLogsServerId === serverId) {
@@ -204,12 +341,6 @@ function stopLiveLogs({ abort = true } = {}) {
   updateLiveButton();
 }
 
-function setTheme(theme) {
-  document.documentElement.setAttribute("data-theme", theme);
-  themeBtn.textContent = theme === "dark" ? "Dark" : "Light";
-  localStorage.setItem("tc-theme", theme);
-}
-
 async function loadCurrentUser() {
   try {
     const response = await apiRequest("/auth/me");
@@ -227,12 +358,16 @@ function updateUserCard() {
     userNameEl.textContent = "-";
     userRoleEl.textContent = "-";
     if (navUsers) navUsers.hidden = true;
+    if (navBranding) navBranding.hidden = true;
     return;
   }
   userNameEl.textContent = currentUser.username;
   userRoleEl.textContent = currentUser.role;
   if (navUsers) {
     navUsers.hidden = currentUser.role !== "owner";
+  }
+  if (navBranding) {
+    navBranding.hidden = currentUser.role !== "owner";
   }
 }
 
@@ -259,6 +394,41 @@ async function loadUsers() {
     if (userList) {
       userList.innerHTML = `<div class="list-item">Unable to load users.</div>`;
     }
+  }
+}
+
+async function uploadBrandingLogo() {
+  if (!currentUser || currentUser.role !== "owner") {
+    toast("Owner access required", "error");
+    return;
+  }
+  if (!brandingFile || !brandingFile.files || !brandingFile.files.length) {
+    toast("Select an image to upload", "error");
+    return;
+  }
+  const file = brandingFile.files[0];
+  const formData = new FormData();
+  formData.append("file", file);
+
+  if (brandingStatus) brandingStatus.textContent = "Uploading…";
+  if (brandingUploadBtn) setButtonLoading(brandingUploadBtn, true, "Uploading…");
+  try {
+    const response = await apiUpload("/branding/logo", formData);
+    brandingVersion = String(response.version || brandingVersion || "0");
+    applyBrandingAssets();
+    renderServers();
+    toast("Logo updated", "success");
+    if (brandingStatus) {
+      const count = typeof response.servers_updated === "number" ? response.servers_updated : null;
+      brandingStatus.textContent =
+        count === null ? "Updated." : `Updated. Server icons refreshed for ${count} server(s).`;
+    }
+    brandingFile.value = "";
+  } catch (err) {
+    toast(err.message, "error");
+    if (brandingStatus) brandingStatus.textContent = err.message || "Upload failed";
+  } finally {
+    if (brandingUploadBtn) setButtonLoading(brandingUploadBtn, false);
   }
 }
 
@@ -320,8 +490,17 @@ function bindTabs(scopeId) {
       panels.forEach((panel) => {
         panel.classList.toggle("active", panel.dataset.tabPanel === target);
       });
+      onTabActivated(scopeId, target);
     });
   });
+}
+
+function onTabActivated(scopeId, tabId) {
+  if (scopeId !== "view-settings") return;
+  activeSettingsTab = tabId;
+  if (tabId === "settings-modconfig") {
+    loadModConfigFiles();
+  }
 }
 
 function updateCounts() {
@@ -332,6 +511,16 @@ function updateCounts() {
   countStopped.textContent = `${stopped} stopped`;
 }
 
+function updateNavAvailability() {
+  const requiresServer = new Set(["view-settings", "view-mods", "view-console"]);
+  navItems.forEach((item) => {
+    const viewId = item.dataset.view;
+    if (!viewId) return;
+    if (!requiresServer.has(viewId)) return;
+    item.disabled = !activeServerId;
+  });
+}
+
 function getActiveServer() {
   if (!activeServerId) return null;
   return servers.find((item) => item.server_id === activeServerId) || null;
@@ -339,6 +528,26 @@ function getActiveServer() {
 
 function renderServers() {
   serverListEl.innerHTML = "";
+  if (isLoadingServers) {
+    emptyStateEl.style.display = "none";
+    for (let i = 0; i < 4; i++) {
+      const skeleton = document.createElement("div");
+      skeleton.className = "server-card skeleton";
+      skeleton.innerHTML = `
+        <div>
+          <div class="skeleton-line title"></div>
+          <div class="skeleton-line meta"></div>
+          <div class="skeleton-line meta"></div>
+        </div>
+        <div class="server-actions">
+          <div class="skeleton-pill"></div>
+          <div class="skeleton-pill"></div>
+        </div>
+      `;
+      serverListEl.appendChild(skeleton);
+    }
+    return;
+  }
   if (!servers.length) {
     emptyStateEl.style.display = "block";
     return;
@@ -348,24 +557,30 @@ function renderServers() {
   servers.forEach((server) => {
     const card = document.createElement("div");
     card.className = "server-card";
+    card.dataset.id = server.server_id;
     if (server.server_id === activeServerId) {
       card.classList.add("active");
     }
-    const status = (server.status || "stopped").toLowerCase();
-    const statusClass = status === "running" ? "running" : "stopped";
+    const displayedStatus = getDisplayedServerStatus(server);
+    const status = (displayedStatus || "stopped").toLowerCase();
+    const statusClass = status === "running" ? "running" : status === "stopped" ? "stopped" : "pending";
     const portLabel = server.port ? `:${server.port}` : "auto";
     card.innerHTML = `
       <div>
-        <h3>${server.name}</h3>
-        <div class="status ${statusClass}">
-          <span class="status-dot"></span>
-          <span>${server.status}</span>
+        <div class="server-title-row">
+          <img class="server-card-icon" src="${brandingAssetUrl("server-icon.png")}" alt="" />
+          <div>
+            <h3>${server.name}</h3>
+            <div class="status ${statusClass}">
+              <span class="status-dot"></span>
+              <span>${displayedStatus}</span>
+            </div>
+          </div>
         </div>
         <div class="server-meta">${server.server_type || "VANILLA"} • ${server.version || "latest"} • ${portLabel}</div>
       </div>
       <div class="server-actions">
         <button class="btn small" data-action="select" data-id="${server.server_id}">Select</button>
-        <button class="btn small" data-action="edit" data-id="${server.server_id}">Edit</button>
       </div>
     `;
     serverListEl.appendChild(card);
@@ -373,28 +588,55 @@ function renderServers() {
 }
 
 function setActiveServer(serverId) {
+  const previousServerId = activeServerId;
   activeServerId = serverId;
   const server = servers.find((item) => item.server_id === serverId);
   if (!server) {
+    try {
+      localStorage.removeItem("tc-active-server");
+    } catch (err) {
+      // ignore
+    }
     activeServerName.textContent = "No server selected";
     activeServerMeta.textContent = "Select a server from the list.";
     settingsServerBadge.textContent = "No server";
     updateOverview(null);
     updateActionButtons(null);
     syncModFiltersWithServer();
+    resetModConfigState();
+    updateConsoleLabel();
+    updateNavAvailability();
     return;
+  }
+  if (previousServerId && previousServerId !== serverId) {
+    resetModConfigState();
+  }
+  try {
+    localStorage.setItem("tc-active-server", serverId);
+  } catch (err) {
+    // ignore
   }
   activeServerName.textContent = server.name;
   activeServerMeta.textContent = `${server.server_type || "VANILLA"} • ${server.version || "latest"}`;
   settingsServerBadge.textContent = server.name;
   updateOverview(server);
   updateActionButtons(server);
-  populateConsoleSelect();
+  updateConsoleLabel();
   renderServers();
   syncModFiltersWithServer();
-  loadSettings();
-  loadWhitelist();
-  loadMods();
+  updateNavAvailability();
+  if (activeSettingsTab === "settings-modconfig") {
+    loadModConfigFiles();
+  }
+  if (activeViewId === "view-settings") {
+    loadSettings();
+  }
+  if (activeViewId === "view-mods") {
+    loadMods();
+  }
+  if (activeViewId === "view-console") {
+    startLiveLogs();
+  }
 }
 
 function updateOverview(server) {
@@ -405,14 +647,36 @@ function updateOverview(server) {
     overviewType.textContent = "-";
     return;
   }
-  overviewStatus.textContent = server.status;
+  const displayedStatus = getDisplayedServerStatus(server);
+  overviewStatus.textContent = displayedStatus;
   overviewPort.textContent = server.port ? `:${server.port}` : "auto";
   overviewVersion.textContent = server.version || "latest";
   overviewType.textContent = server.server_type || "VANILLA";
+
+  const portLabel = server.port ? `:${server.port}` : "auto";
+  activeServerMeta.textContent = `${displayedStatus} • ${server.server_type || "VANILLA"} • ${server.version || "latest"} • ${portLabel}`;
+}
+
+function updateConsoleLabel() {
+  if (!consoleServerLabel) return;
+  const server = getActiveServer();
+  if (!server) {
+    consoleServerLabel.textContent = "No server selected";
+    return;
+  }
+  const status = getDisplayedServerStatus(server);
+  const portLabel = server.port ? `:${server.port}` : "auto";
+  consoleServerLabel.textContent = `${server.name} • ${status} • ${portLabel}`;
 }
 
 function updateActionButtons(server) {
   if (!server) {
+    startBtn.disabled = true;
+    stopBtn.disabled = true;
+    restartBtn.disabled = true;
+    return;
+  }
+  if (pendingServerActions[server.server_id]) {
     startBtn.disabled = true;
     stopBtn.disabled = true;
     restartBtn.disabled = true;
@@ -472,41 +736,37 @@ function syncModFiltersWithServer() {
   modSearchBtn.disabled = false;
 }
 
-function populateConsoleSelect() {
-  consoleSelect.innerHTML = "";
-  if (!servers.length) {
-    const option = document.createElement("option");
-    option.textContent = "No servers available";
-    option.value = "";
-    consoleSelect.appendChild(option);
-    return;
+async function loadServers({ showLoading = true } = {}) {
+  if (showLoading) {
+    isLoadingServers = true;
+    refreshBtn.disabled = true;
+    renderServers();
   }
-  servers.forEach((server) => {
-    const option = document.createElement("option");
-    option.textContent = `${server.name} (${server.status})`;
-    option.value = server.server_id;
-    consoleSelect.appendChild(option);
-  });
-  if (activeServerId) {
-    consoleSelect.value = activeServerId;
-  }
-}
-
-async function loadServers() {
   try {
     servers = await apiRequest("/servers");
     updateCounts();
     renderServers();
-    populateConsoleSelect();
-    if (!activeServerId && servers.length) {
-      setActiveServer(servers[0].server_id);
-    } else if (activeServerId) {
-      setActiveServer(activeServerId);
+    let desiredServerId = activeServerId;
+    if (!desiredServerId) {
+      try {
+        desiredServerId = localStorage.getItem("tc-active-server");
+      } catch (err) {
+        desiredServerId = null;
+      }
+    }
+    if (desiredServerId && servers.some((s) => s.server_id === desiredServerId)) {
+      setActiveServer(desiredServerId);
     } else {
-      syncModFiltersWithServer();
+      setActiveServer(null);
     }
   } catch (err) {
     toast(err.message, "error");
+  } finally {
+    if (showLoading) {
+      isLoadingServers = false;
+      refreshBtn.disabled = false;
+      renderServers();
+    }
   }
 }
 
@@ -520,14 +780,12 @@ function buildCreateEnv() {
   env.ALLOW_END = document.getElementById("createAllowEnd").checked ? "TRUE" : "FALSE";
   env.ENABLE_COMMAND_BLOCK = document.getElementById("createCommandBlocks").checked ? "TRUE" : "FALSE";
   env.ONLINE_MODE = document.getElementById("createOnlineMode").checked ? "TRUE" : "FALSE";
-  env.WHITELIST = document.getElementById("createWhitelist").checked ? "TRUE" : "FALSE";
   env.ALLOW_FLIGHT = document.getElementById("createAllowFlight").checked ? "TRUE" : "FALSE";
   env.SPAWN_ANIMALS = document.getElementById("createSpawnAnimals").checked ? "TRUE" : "FALSE";
   env.SPAWN_MONSTERS = document.getElementById("createSpawnMonsters").checked ? "TRUE" : "FALSE";
   env.SPAWN_NPCS = document.getElementById("createSpawnNpcs").checked ? "TRUE" : "FALSE";
   env.BROADCAST_CONSOLE_TO_OPS = document.getElementById("createBroadcastConsole").checked ? "TRUE" : "FALSE";
   env.BROADCAST_RCON_TO_OPS = document.getElementById("createBroadcastRcon").checked ? "TRUE" : "FALSE";
-  env.ENABLE_QUERY = document.getElementById("createEnableQuery").value === "true" ? "TRUE" : "FALSE";
 
   env.MAX_PLAYERS = String(document.getElementById("createMaxPlayers").value);
   env.OP_PERMISSION_LEVEL = String(document.getElementById("createOpPermissionLevel").value);
@@ -541,31 +799,26 @@ function buildCreateEnv() {
   const motd = document.getElementById("createMotd").value.trim();
   const levelSeed = document.getElementById("createLevelSeed").value.trim();
   const levelType = document.getElementById("createLevelType").value.trim();
-  const serverIp = document.getElementById("createServerIp").value.trim();
   const resourcePack = document.getElementById("createResourcePack").value.trim();
   const resourcePackSha1 = document.getElementById("createResourcePackSha1").value.trim();
-  const queryPort = document.getElementById("createQueryPort").value.trim();
 
   if (motd) env.MOTD = motd;
   if (levelSeed) env.LEVEL_SEED = levelSeed;
   if (levelType) env.LEVEL_TYPE = levelType;
-  if (serverIp) env.SERVER_IP = serverIp;
   if (resourcePack) env.RESOURCE_PACK = resourcePack;
   if (resourcePackSha1) env.RESOURCE_PACK_SHA1 = resourcePackSha1;
-  if (document.getElementById("createEnableQuery").value === "true" && queryPort) {
-    env.QUERY_PORT = queryPort;
-  }
 
   return env;
 }
 
 async function createServer(event) {
   event.preventDefault();
+  const submitBtn = createForm.querySelector('button[type="submit"]');
+  setButtonLoading(submitBtn, true, "Creating…");
   const name = document.getElementById("createName").value.trim();
   const version = document.getElementById("createVersion").value.trim();
   const serverType = document.getElementById("createType").value;
   const memory = parseInt(document.getElementById("createMemory").value, 10);
-  const portValue = document.getElementById("createPort").value.trim();
   const eula = document.getElementById("createEula").checked;
   const rconPassword = document.getElementById("createRconPassword").value.trim();
   const enableRcon = document.getElementById("createEnableRcon").checked;
@@ -585,7 +838,6 @@ async function createServer(event) {
   };
 
   if (version) payload.version = version;
-  if (portValue) payload.port = parseInt(portValue, 10);
   if (rconPassword) payload.rcon_password = rconPassword;
 
   try {
@@ -601,6 +853,8 @@ async function createServer(event) {
     showView("view-servers");
   } catch (err) {
     toast(err.message, "error");
+  } finally {
+    setButtonLoading(submitBtn, false);
   }
 }
 
@@ -613,7 +867,7 @@ function applySettingsDefaults() {
   settingsAllowEnd.checked = true;
   settingsCommandBlocks.checked = false;
   settingsLevelSeed.value = "";
-  settingsLevelType.value = "";
+  settingsLevelType.value = "minecraft:normal";
   settingsSpawnProtection.value = "16";
   settingsSpawnAnimals.checked = true;
   settingsSpawnMonsters.checked = true;
@@ -622,15 +876,10 @@ function applySettingsDefaults() {
   settingsOpPermissionLevel.value = "4";
   settingsPlayerIdleTimeout.value = "0";
   settingsOnlineMode.checked = true;
-  settingsWhitelist.checked = false;
   settingsViewDistance.value = "10";
   settingsSimulationDistance.value = "10";
   settingsMaxTickTime.value = "60000";
   settingsEntityBroadcastRange.value = "100";
-  settingsServerPort.value = "";
-  settingsServerIp.value = "";
-  settingsEnableQuery.value = "false";
-  settingsQueryPort.value = "25565";
   settingsMotd.value = "";
   settingsAllowFlight.checked = false;
   settingsBroadcastConsoleToOps.checked = true;
@@ -653,7 +902,7 @@ async function loadSettings() {
     if (settings.allow_end !== undefined) settingsAllowEnd.checked = settings.allow_end;
     if (settings.enable_command_block !== undefined) settingsCommandBlocks.checked = settings.enable_command_block;
     if (settings.level_seed !== undefined) settingsLevelSeed.value = settings.level_seed || "";
-    if (settings.level_type !== undefined) settingsLevelType.value = settings.level_type || "";
+    if (settings.level_type !== undefined) settingsLevelType.value = settings.level_type || "minecraft:normal";
     if (settings.spawn_protection !== undefined) settingsSpawnProtection.value = settings.spawn_protection ?? "";
     if (settings.spawn_animals !== undefined) settingsSpawnAnimals.checked = settings.spawn_animals;
     if (settings.spawn_monsters !== undefined) settingsSpawnMonsters.checked = settings.spawn_monsters;
@@ -662,21 +911,11 @@ async function loadSettings() {
     if (settings.op_permission_level !== undefined) settingsOpPermissionLevel.value = settings.op_permission_level ?? "";
     if (settings.player_idle_timeout !== undefined) settingsPlayerIdleTimeout.value = settings.player_idle_timeout ?? "";
     if (settings.online_mode !== undefined) settingsOnlineMode.checked = settings.online_mode;
-    if (settings.whitelist !== undefined) settingsWhitelist.checked = settings.whitelist;
     if (settings.view_distance !== undefined) settingsViewDistance.value = settings.view_distance ?? "";
     if (settings.simulation_distance !== undefined) settingsSimulationDistance.value = settings.simulation_distance ?? "";
     if (settings.max_tick_time !== undefined) settingsMaxTickTime.value = settings.max_tick_time ?? "";
     if (settings.entity_broadcast_range_percentage !== undefined) settingsEntityBroadcastRange.value = settings.entity_broadcast_range_percentage ?? "";
-    if (settings.server_port !== undefined && settings.server_port !== null) {
-      settingsServerPort.value = settings.server_port;
-    } else {
-      const server = servers.find((item) => item.server_id === activeServerId);
-      if (server && server.port) settingsServerPort.value = server.port;
-    }
-    if (settings.server_ip !== undefined) settingsServerIp.value = settings.server_ip || "";
     if (settings.motd !== undefined) settingsMotd.value = settings.motd || "";
-    if (settings.enable_query !== undefined) settingsEnableQuery.value = settings.enable_query ? "true" : "false";
-    if (settings.query_port !== undefined) settingsQueryPort.value = settings.query_port ?? "";
     if (settings.allow_flight !== undefined) settingsAllowFlight.checked = settings.allow_flight;
     if (settings.broadcast_console_to_ops !== undefined) settingsBroadcastConsoleToOps.checked = settings.broadcast_console_to_ops;
     if (settings.broadcast_rcon_to_ops !== undefined) settingsBroadcastRconToOps.checked = settings.broadcast_rcon_to_ops;
@@ -702,12 +941,9 @@ function collectSettingsPayload() {
     spawn_monsters: settingsSpawnMonsters.checked,
     spawn_npcs: settingsSpawnNpcs.checked,
     online_mode: settingsOnlineMode.checked,
-    whitelist: settingsWhitelist.checked,
     allow_flight: settingsAllowFlight.checked,
     broadcast_console_to_ops: settingsBroadcastConsoleToOps.checked,
     broadcast_rcon_to_ops: settingsBroadcastRconToOps.checked,
-    enable_query: settingsEnableQuery.value === "true",
-    server_ip: settingsServerIp.value.trim(),
     motd: settingsMotd.value.trim(),
     resource_pack: settingsResourcePack.value.trim(),
     resource_pack_sha1: settingsResourcePackSha1.value.trim(),
@@ -721,10 +957,6 @@ function collectSettingsPayload() {
   if (settingsMaxTickTime.value !== "") payload.max_tick_time = parseInt(settingsMaxTickTime.value, 10);
   if (settingsEntityBroadcastRange.value !== "") payload.entity_broadcast_range_percentage = parseInt(settingsEntityBroadcastRange.value, 10);
   if (settingsSpawnProtection.value !== "") payload.spawn_protection = parseInt(settingsSpawnProtection.value, 10);
-  if (settingsServerPort.value !== "") payload.server_port = parseInt(settingsServerPort.value, 10);
-  if (settingsEnableQuery.value === "true" && settingsQueryPort.value !== "") {
-    payload.query_port = parseInt(settingsQueryPort.value, 10);
-  }
 
   return payload;
 }
@@ -749,67 +981,182 @@ async function saveSettings(event) {
   }
 }
 
-async function loadWhitelist() {
-  if (!activeServerId) return;
-  try {
-    const response = await apiRequest(`/servers/${activeServerId}/whitelist`);
-    renderWhitelist(response.names || []);
-  } catch (err) {
-    renderWhitelist([]);
+function resetModConfigState() {
+  modConfigFiles = [];
+  modConfigSelectedPath = null;
+  modConfigLoadedForServerId = null;
+  modConfigDirty = false;
+  modConfigLoading = false;
+  modConfigListMessage = "";
+  if (modConfigFilter) modConfigFilter.value = "";
+  if (modConfigList) modConfigList.innerHTML = "";
+  if (modConfigPath) modConfigPath.textContent = "No file selected";
+  if (modConfigEditor) {
+    modConfigEditor.value = "";
+    modConfigEditor.disabled = true;
+  }
+  if (modConfigSaveBtn) modConfigSaveBtn.disabled = true;
+  if (modConfigReloadBtn) modConfigReloadBtn.disabled = true;
+  if (modConfigStatus) modConfigStatus.textContent = "";
+}
+
+function setModConfigStatus(message) {
+  if (!modConfigStatus) return;
+  modConfigStatus.textContent = message || "";
+}
+
+function updateModConfigActions() {
+  const hasFile = !!modConfigSelectedPath;
+  if (modConfigSaveBtn) {
+    modConfigSaveBtn.disabled = !hasFile || !modConfigDirty || modConfigLoading;
+  }
+  if (modConfigReloadBtn) {
+    modConfigReloadBtn.disabled = !hasFile || modConfigLoading;
   }
 }
 
-function renderWhitelist(names) {
-  whitelistList.innerHTML = "";
-  if (!names.length) {
-    const empty = document.createElement("div");
-    empty.className = "list-item";
-    empty.textContent = "No whitelisted players";
-    whitelistList.appendChild(empty);
+function renderModConfigList() {
+  if (!modConfigList) return;
+  const filter = (modConfigFilter?.value || "").trim().toLowerCase();
+  const files = filter
+    ? modConfigFiles.filter((file) => file.path.toLowerCase().includes(filter))
+    : modConfigFiles;
+
+  modConfigList.innerHTML = "";
+  if (!activeServerId) {
+    modConfigList.innerHTML = `<div class="list-item">Select a server to view config files.</div>`;
     return;
   }
-  names.forEach((name) => {
+  if (modConfigListMessage) {
     const item = document.createElement("div");
     item.className = "list-item";
-    item.innerHTML = `<span>${name}</span><button class="btn small" data-name="${name}">Remove</button>`;
-    whitelistList.appendChild(item);
+    item.textContent = modConfigListMessage;
+    modConfigList.appendChild(item);
+    return;
+  }
+  if (!files.length) {
+    modConfigList.innerHTML = `<div class="list-item">No config files found. Start the server once to generate configs.</div>`;
+    return;
+  }
+
+  files.forEach((file) => {
+    const item = document.createElement("div");
+    item.className = "list-item";
+    item.dataset.path = file.path;
+    const selected = file.path === modConfigSelectedPath;
+    if (selected) item.classList.add("active");
+    const size = typeof file.size_bytes === "number" ? `${Math.round(file.size_bytes / 1024)} KB` : "";
+    item.innerHTML = `<div><strong>${file.path}</strong><br /><small>${size}</small></div>
+      <button class="btn small" type="button" data-action="open">Open</button>`;
+    modConfigList.appendChild(item);
   });
 }
 
-async function addWhitelist() {
-  const name = whitelistName.value.trim();
-  if (!name) {
-    toast("Enter a player name", "error");
+async function loadModConfigFiles() {
+  if (activeSettingsTab !== "settings-modconfig") return;
+  if (!activeServerId) {
+    resetModConfigState();
+    renderModConfigList();
     return;
   }
+
+  modConfigLoading = true;
+  modConfigListMessage = "";
+  updateModConfigActions();
+  setModConfigStatus("Loading config files…");
+  if (modConfigEditor) modConfigEditor.disabled = true;
+
+  try {
+    const response = await apiRequest(`/servers/${activeServerId}/mod-settings`);
+    modConfigFiles = response.files || [];
+    modConfigLoadedForServerId = activeServerId;
+    modConfigSelectedPath = null;
+    modConfigDirty = false;
+    if (modConfigPath) modConfigPath.textContent = "No file selected";
+    if (modConfigEditor) modConfigEditor.value = "";
+    renderModConfigList();
+    setModConfigStatus(modConfigFiles.length ? "" : "No configs yet. Start the server once to generate files.");
+  } catch (err) {
+    modConfigFiles = [];
+    modConfigLoadedForServerId = activeServerId;
+    modConfigListMessage = err.message || "Unable to load config files.";
+    renderModConfigList();
+    setModConfigStatus(modConfigListMessage);
+  } finally {
+    modConfigLoading = false;
+    updateModConfigActions();
+  }
+}
+
+async function openModConfigFile(path) {
   if (!activeServerId) {
     toast("Select a server first", "error");
     return;
   }
+  if (!path) return;
+  if (modConfigDirty) {
+    const ok = window.confirm("Discard unsaved changes?");
+    if (!ok) return;
+  }
+  modConfigSelectedPath = path;
+  modConfigDirty = false;
+  if (modConfigPath) modConfigPath.textContent = path;
+  if (modConfigEditor) {
+    modConfigEditor.disabled = true;
+    modConfigEditor.value = "";
+  }
+  updateModConfigActions();
+  setModConfigStatus("Loading file…");
+  renderModConfigList();
+
   try {
-    const response = await apiRequest(`/servers/${activeServerId}/whitelist`, {
-      method: "POST",
-      body: JSON.stringify({ name, action: "add" }),
-    });
-    whitelistName.value = "";
-    renderWhitelist(response.names || []);
-    toast("Player added to whitelist", "success");
+    const encodedPath = encodePathSegments(path);
+    const response = await apiRequest(`/servers/${activeServerId}/mod-settings/${encodedPath}`);
+    if (modConfigEditor) {
+      modConfigEditor.value = response.content || "";
+      modConfigEditor.disabled = false;
+      modConfigEditor.focus();
+    }
+    setModConfigStatus("");
+    updateModConfigActions();
   } catch (err) {
     toast(err.message, "error");
+    setModConfigStatus(err.message || "Failed to load file.");
   }
 }
 
-async function removeWhitelist(name) {
-  if (!activeServerId) return;
+async function saveModConfigFile() {
+  if (!activeServerId || !modConfigSelectedPath) return;
+  if (modConfigLoading) return;
+  const content = modConfigEditor?.value ?? "";
+  const restart = modConfigRestart?.value === "true";
+
+  modConfigLoading = true;
+  updateModConfigActions();
+  setModConfigStatus("Saving…");
+  if (modConfigSaveBtn) setButtonLoading(modConfigSaveBtn, true, "Saving…");
+  if (modConfigEditor) modConfigEditor.disabled = true;
+
   try {
-    const response = await apiRequest(`/servers/${activeServerId}/whitelist`, {
-      method: "POST",
-      body: JSON.stringify({ name, action: "remove" }),
-    });
-    renderWhitelist(response.names || []);
-    toast("Player removed", "success");
+    const encodedPath = encodePathSegments(modConfigSelectedPath);
+    await apiRequest(
+      `/servers/${activeServerId}/mod-settings/${encodedPath}?restart=${restart ? "true" : "false"}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ content }),
+      }
+    );
+    toast("Config saved", "success");
+    modConfigDirty = false;
+    setModConfigStatus(restart ? "Saved. Restart requested." : "Saved.");
   } catch (err) {
     toast(err.message, "error");
+    setModConfigStatus(err.message || "Failed to save file.");
+  } finally {
+    if (modConfigSaveBtn) setButtonLoading(modConfigSaveBtn, false);
+    if (modConfigEditor) modConfigEditor.disabled = false;
+    modConfigLoading = false;
+    updateModConfigActions();
   }
 }
 
@@ -822,15 +1169,27 @@ async function deleteServer() {
     toast("Confirm deletion first", "error");
     return;
   }
+  const deletingServerId = activeServerId;
+  const deletedSnapshot = servers.slice();
+  setPendingAction(deletingServerId, "delete");
+  servers = servers.filter((s) => s.server_id !== deletingServerId);
+  if (activeServerId === deletingServerId) {
+    activeServerId = null;
+  }
+  renderServers();
+  updateCounts();
+  setActiveServer(activeServerId);
   const retain = deleteKeepData.checked ? "true" : "false";
   try {
-    await apiRequest(`/servers/${activeServerId}?retain_data=${retain}`, { method: "DELETE" });
+    await apiRequest(`/servers/${deletingServerId}?retain_data=${retain}`, { method: "DELETE" });
     toast("Server deleted", "success");
-    activeServerId = null;
     deleteConfirm.checked = false;
-    await loadServers();
   } catch (err) {
+    servers = deletedSnapshot;
     toast(err.message, "error");
+    await loadServers();
+  } finally {
+    clearPendingAction(deletingServerId);
   }
 }
 
@@ -1102,17 +1461,33 @@ async function sendServerAction(action) {
     toast("Select a server first", "error");
     return;
   }
+  const serverId = activeServerId;
+  const actionBtn = action === "start" ? startBtn : action === "stop" ? stopBtn : restartBtn;
+  setPendingAction(serverId, action);
+  setButtonLoading(actionBtn, true, `${capitalize(action)}ing…`);
   try {
-    await apiRequest(`/servers/${activeServerId}/${action}`, { method: "POST" });
-    toast(`${action} requested`, "success");
-    await loadServers();
+    await apiRequest(`/servers/${serverId}/${action}`, { method: "POST" });
+    toast(`${capitalize(action)} requested`, "success");
+    const deadline = Date.now() + 45000;
+    const desired = action === "start" ? "running" : action === "stop" ? "stopped" : null;
+    while (Date.now() < deadline) {
+      await loadServers({ showLoading: false });
+      const current = servers.find((s) => s.server_id === serverId);
+      if (!current) break;
+      if (desired && current.status === desired) break;
+      if (!desired) break;
+      await new Promise((resolve) => setTimeout(resolve, 900));
+    }
   } catch (err) {
     toast(err.message, "error");
+  } finally {
+    setButtonLoading(actionBtn, false);
+    clearPendingAction(serverId);
   }
 }
 
 async function fetchLogs() {
-  const serverId = consoleSelect.value;
+  const serverId = activeServerId;
   if (!serverId) {
     toast("Select a server first", "error");
     return;
@@ -1126,7 +1501,7 @@ async function fetchLogs() {
 }
 
 async function sendCommand() {
-  const serverId = consoleSelect.value;
+  const serverId = activeServerId;
   const command = commandInput.value.trim();
   if (!serverId) {
     toast("Select a server first", "error");
@@ -1151,16 +1526,18 @@ async function sendCommand() {
 function bindEvents() {
   navItems.forEach((item) => {
     item.addEventListener("click", () => {
-      showView(item.dataset.view);
-      if (item.dataset.view === "view-users") {
+      const viewId = item.dataset.view;
+      const requiresServer = viewId === "view-settings" || viewId === "view-mods" || viewId === "view-console";
+      if (requiresServer && !activeServerId) {
+        toast("Select a server first", "error");
+        showView("view-servers");
+        return;
+      }
+      showView(viewId);
+      if (viewId === "view-users") {
         loadUsers();
       }
     });
-  });
-
-  themeBtn.addEventListener("click", () => {
-    const current = document.documentElement.getAttribute("data-theme");
-    setTheme(current === "dark" ? "light" : "dark");
   });
 
   if (logoutBtn) {
@@ -1174,17 +1551,19 @@ function bindEvents() {
   restartBtn.addEventListener("click", () => sendServerAction("restart"));
 
   serverListEl.addEventListener("click", (event) => {
-    const action = event.target.dataset.action;
-    const serverId = event.target.dataset.id;
-    if (!serverId) return;
-    if (action === "select") {
-      setActiveServer(serverId);
+    const button = event.target.closest("button");
+    if (button && button.dataset.action && button.dataset.id) {
+      const action = button.dataset.action;
+      const serverId = button.dataset.id;
+      if (action === "select") {
+        setActiveServer(serverId);
+      }
       return;
     }
-    if (action === "edit") {
-      setActiveServer(serverId);
-      showView("view-settings");
-      return;
+
+    const card = event.target.closest(".server-card");
+    if (card && card.dataset.id) {
+      setActiveServer(card.dataset.id);
     }
   });
 
@@ -1194,17 +1573,39 @@ function bindEvents() {
 
   createForm.addEventListener("submit", createServer);
   settingsForm.addEventListener("submit", saveSettings);
-  whitelistAddBtn.addEventListener("click", addWhitelist);
-  whitelistName.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      addWhitelist();
-    }
-  });
-  whitelistList.addEventListener("click", (event) => {
-    const name = event.target.dataset.name;
-    if (name) removeWhitelist(name);
-  });
+  if (modConfigFilter) {
+    modConfigFilter.addEventListener("input", () => {
+      renderModConfigList();
+    });
+  }
+  if (modConfigList) {
+    modConfigList.addEventListener("click", (event) => {
+      const item = event.target.closest(".list-item");
+      if (!item) return;
+      const path = item.dataset.path;
+      if (!path) return;
+      openModConfigFile(path);
+    });
+  }
+  if (modConfigEditor) {
+    modConfigEditor.addEventListener("input", () => {
+      if (!modConfigSelectedPath) return;
+      modConfigDirty = true;
+      updateModConfigActions();
+    });
+  }
+  if (modConfigReloadBtn) {
+    modConfigReloadBtn.addEventListener("click", () => {
+      if (modConfigSelectedPath) {
+        openModConfigFile(modConfigSelectedPath);
+      } else {
+        loadModConfigFiles();
+      }
+    });
+  }
+  if (modConfigSaveBtn) {
+    modConfigSaveBtn.addEventListener("click", saveModConfigFile);
+  }
 
   deleteServerBtn.addEventListener("click", deleteServer);
 
@@ -1272,11 +1673,6 @@ function bindEvents() {
       startLiveLogs();
     }
   });
-  consoleSelect.addEventListener("change", () => {
-    if (liveLogsActive) {
-      startLiveLogs();
-    }
-  });
   clearLogsBtn.addEventListener("click", () => {
     resetLogBuffer("Logs cleared.");
   });
@@ -1291,16 +1687,22 @@ function bindEvents() {
   if (userCreateForm) {
     userCreateForm.addEventListener("submit", createUser);
   }
+
+  if (brandingUploadBtn) {
+    brandingUploadBtn.addEventListener("click", uploadBrandingLogo);
+  }
+  if (brandingFile) {
+    brandingFile.addEventListener("change", () => {
+      if (!brandingStatus) return;
+      brandingStatus.textContent =
+        brandingFile.files && brandingFile.files.length ? brandingFile.files[0].name : "";
+    });
+  }
 }
 
 function bindTabGroups() {
   bindTabs("view-create");
   bindTabs("view-settings");
-}
-
-function setupTheme() {
-  const saved = localStorage.getItem("tc-theme");
-  setTheme(saved || "dark");
 }
 
 function getSettingsInputs() {
@@ -1322,15 +1724,10 @@ function getSettingsInputs() {
     settingsOpPermissionLevel: document.getElementById("settingsOpPermissionLevel"),
     settingsPlayerIdleTimeout: document.getElementById("settingsPlayerIdleTimeout"),
     settingsOnlineMode: document.getElementById("settingsOnlineMode"),
-    settingsWhitelist: document.getElementById("settingsWhitelist"),
     settingsViewDistance: document.getElementById("settingsViewDistance"),
     settingsSimulationDistance: document.getElementById("settingsSimulationDistance"),
     settingsMaxTickTime: document.getElementById("settingsMaxTickTime"),
     settingsEntityBroadcastRange: document.getElementById("settingsEntityBroadcastRange"),
-    settingsServerPort: document.getElementById("settingsServerPort"),
-    settingsServerIp: document.getElementById("settingsServerIp"),
-    settingsEnableQuery: document.getElementById("settingsEnableQuery"),
-    settingsQueryPort: document.getElementById("settingsQueryPort"),
     settingsMotd: document.getElementById("settingsMotd"),
     settingsAllowFlight: document.getElementById("settingsAllowFlight"),
     settingsBroadcastConsoleToOps: document.getElementById("settingsBroadcastConsoleToOps"),
@@ -1358,15 +1755,10 @@ const {
   settingsOpPermissionLevel,
   settingsPlayerIdleTimeout,
   settingsOnlineMode,
-  settingsWhitelist,
   settingsViewDistance,
   settingsSimulationDistance,
   settingsMaxTickTime,
   settingsEntityBroadcastRange,
-  settingsServerPort,
-  settingsServerIp,
-  settingsEnableQuery,
-  settingsQueryPort,
   settingsMotd,
   settingsAllowFlight,
   settingsBroadcastConsoleToOps,
@@ -1376,11 +1768,14 @@ const {
 } = getSettingsInputs();
 
 window.addEventListener("DOMContentLoaded", () => {
-  setupTheme();
+  loadBrandingVersion();
   bindEvents();
   bindTabGroups();
   applySettingsDefaults();
   updateLiveButton();
+  updateNavAvailability();
+  resetModConfigState();
+  updateConsoleLabel();
   loadCurrentUser().then((authenticated) => {
     if (authenticated) {
       loadServers();

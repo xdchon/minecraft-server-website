@@ -4,17 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MCServer Control Panel</title>
+  <link id="faviconLink" rel="icon" type="image/png" href="/branding/favicon.png" />
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
   <div class="bg"></div>
   <div class="layout">
     <aside class="sidebar">
-      <div class="logo">MCServer</div>
-      <div class="logo-sub">Private Minecraft Studio</div>
-      <div class="theme-toggle">
-        <span>Theme</span>
-        <button id="themeBtn" class="pill">Dark</button>
+      <div class="brand">
+        <img id="brandLogo" class="brand-logo" src="/branding/logo.png" alt="Logo" />
+        <div class="brand-text">
+          <div class="logo">MCServer</div>
+          <div class="logo-sub">Private Minecraft Studio</div>
+        </div>
       </div>
       <nav class="nav">
         <button class="nav-item active" data-view="view-servers">Servers</button>
@@ -22,6 +24,7 @@
         <button class="nav-item" data-view="view-settings">Settings</button>
         <button class="nav-item" data-view="view-mods">Mods</button>
         <button class="nav-item" data-view="view-console">Console</button>
+        <button class="nav-item" data-view="view-branding" id="navBranding" hidden>Branding</button>
         <button class="nav-item" data-view="view-users" id="navUsers" hidden>Users</button>
       </nav>
       <div class="sidebar-card" id="userCard">
@@ -42,7 +45,7 @@
     <main class="main">
       <header class="topbar">
         <div class="active-server">
-          <div class="label">Active server</div>
+          <div class="label">Selected server</div>
           <div id="activeServerName" class="value">No server selected</div>
           <div id="activeServerMeta" class="meta">Select a server from the list.</div>
         </div>
@@ -105,7 +108,6 @@
                 <button class="tab" data-tab="create-world" type="button">World</button>
                 <button class="tab" data-tab="create-access" type="button">Access</button>
                 <button class="tab" data-tab="create-performance" type="button">Performance</button>
-                <button class="tab" data-tab="create-network" type="button">Network</button>
                 <button class="tab" data-tab="create-misc" type="button">Misc</button>
               </div>
 
@@ -134,8 +136,8 @@
                     <div id="createMemoryValue" class="hint">2048 MB</div>
                   </div>
                   <div class="field">
-                    <label>Server port (auto if blank)</label>
-                    <input id="createPort" type="number" min="1" max="65535" placeholder="25565" />
+                    <label>Server port</label>
+                    <div class="hint">Assigned automatically.</div>
                   </div>
                   <div class="field">
                     <label>Message of the day</label>
@@ -239,10 +241,6 @@
                     <input id="createOnlineMode" type="checkbox" checked />
                     <span>Online mode (auth)</span>
                   </label>
-                  <label class="toggle">
-                    <input id="createWhitelist" type="checkbox" />
-                    <span>Enable whitelist</span>
-                  </label>
                 </div>
               </div>
 
@@ -263,26 +261,6 @@
                   <div class="field">
                     <label>Entity broadcast range (%)</label>
                     <input id="createEntityBroadcastRange" type="number" min="10" max="500" value="100" />
-                  </div>
-                </div>
-              </div>
-
-              <div class="tab-content" data-tab-panel="create-network">
-                <div class="form-grid">
-                  <div class="field">
-                    <label>Server IP (optional)</label>
-                    <input id="createServerIp" type="text" placeholder="Leave blank" />
-                  </div>
-                  <div class="field">
-                    <label>Enable query</label>
-                    <select id="createEnableQuery">
-                      <option value="false">No</option>
-                      <option value="true">Yes</option>
-                    </select>
-                  </div>
-                  <div class="field">
-                    <label>Query port</label>
-                    <input id="createQueryPort" type="number" min="1" max="65535" value="25565" />
                   </div>
                 </div>
               </div>
@@ -335,7 +313,6 @@
             </div>
             <ul class="tips">
               <li>Fabric and Forge allow mods. Vanilla and Paper are plugin-friendly.</li>
-              <li>Enable whitelist and add players from the Settings tab.</li>
               <li>Use Mods tab to search Modrinth and install with one click.</li>
             </ul>
           </div>
@@ -354,14 +331,17 @@
               <button class="tab" data-tab="settings-world" type="button">World</button>
               <button class="tab" data-tab="settings-access" type="button">Access</button>
               <button class="tab" data-tab="settings-performance" type="button">Performance</button>
-              <button class="tab" data-tab="settings-network" type="button">Network</button>
               <button class="tab" data-tab="settings-misc" type="button">Misc</button>
-              <button class="tab" data-tab="settings-whitelist" type="button">Whitelist</button>
+              <button class="tab" data-tab="settings-modconfig" type="button">Mod Config</button>
               <button class="tab" data-tab="settings-danger" type="button">Danger</button>
             </div>
             <form id="settingsForm" class="form">
               <div class="tab-content active" data-tab-panel="settings-gameplay">
                 <div class="form-grid">
+                  <div class="field">
+                    <label>Message of the day</label>
+                    <input id="settingsMotd" type="text" />
+                  </div>
                   <div class="field">
                     <label>Gamemode</label>
                     <select id="settingsGamemode">
@@ -407,11 +387,13 @@
                 <div class="form-grid">
                   <div class="field">
                     <label>World seed</label>
-                    <input id="settingsLevelSeed" type="text" />
+                    <input id="settingsLevelSeed" type="text" placeholder="Random (leave blank)" />
+                    <div class="hint">Default: random</div>
                   </div>
                   <div class="field">
                     <label>World type</label>
-                    <input id="settingsLevelType" type="text" />
+                    <input id="settingsLevelType" type="text" placeholder="minecraft:normal" />
+                    <div class="hint">Default: minecraft:normal</div>
                   </div>
                   <div class="field">
                     <label>Spawn protection</label>
@@ -455,10 +437,6 @@
                     <input id="settingsOnlineMode" type="checkbox" />
                     <span>Online mode (auth)</span>
                   </label>
-                  <label class="toggle">
-                    <input id="settingsWhitelist" type="checkbox" />
-                    <span>Enable whitelist</span>
-                  </label>
                 </div>
               </div>
 
@@ -479,35 +457,6 @@
                   <div class="field">
                     <label>Entity broadcast range (%)</label>
                     <input id="settingsEntityBroadcastRange" type="number" min="10" max="500" />
-                  </div>
-                </div>
-              </div>
-
-              <div class="tab-content" data-tab-panel="settings-network">
-                <div class="form-grid">
-                  <div class="field">
-                    <label>Server port</label>
-                    <input id="settingsServerPort" type="number" min="1" max="65535" />
-                    <div class="hint">Changing port recreates the container.</div>
-                  </div>
-                  <div class="field">
-                    <label>Server IP</label>
-                    <input id="settingsServerIp" type="text" />
-                  </div>
-                  <div class="field">
-                    <label>MOTD</label>
-                    <input id="settingsMotd" type="text" />
-                  </div>
-                  <div class="field">
-                    <label>Enable query</label>
-                    <select id="settingsEnableQuery">
-                      <option value="false">No</option>
-                      <option value="true">Yes</option>
-                    </select>
-                  </div>
-                  <div class="field">
-                    <label>Query port</label>
-                    <input id="settingsQueryPort" type="number" min="1" max="65535" />
                   </div>
                 </div>
               </div>
@@ -537,19 +486,30 @@
                 </div>
               </div>
 
-              <div class="tab-content" data-tab-panel="settings-whitelist">
-                <div class="form-grid">
-                  <div class="field">
-                    <label>Add player</label>
-                    <div class="inline-input">
-                      <input id="whitelistName" type="text" placeholder="playername" />
-                      <button id="whitelistAddBtn" class="btn" type="button">Add</button>
+              <div class="tab-content" data-tab-panel="settings-modconfig">
+                <div class="mod-config-grid">
+                  <div class="mod-config-list">
+                    <div class="field">
+                      <label>Config files</label>
+                      <input id="modConfigFilter" type="text" placeholder="Filter config files" />
+                      <div class="hint">Edit text files under <code>/config</code> for this server.</div>
                     </div>
-                    <div class="hint">Requires RCON enabled and server running.</div>
+                    <div id="modConfigList" class="list"></div>
                   </div>
-                  <div class="field">
-                    <label>Whitelisted players</label>
-                    <div id="whitelistList" class="list"></div>
+                  <div class="mod-config-editor">
+                    <div class="mod-config-header">
+                      <span id="modConfigPath" class="chip">No file selected</span>
+                      <div class="mod-config-actions">
+                        <select id="modConfigRestart">
+                          <option value="true" selected>Restart after save</option>
+                          <option value="false">Don't restart</option>
+                        </select>
+                        <button id="modConfigReloadBtn" class="btn ghost" type="button" disabled>Reload</button>
+                        <button id="modConfigSaveBtn" class="btn primary" type="button" disabled>Save</button>
+                      </div>
+                    </div>
+                    <textarea id="modConfigEditor" class="config-editor" spellcheck="false" placeholder="Select a config file to edit…" disabled></textarea>
+                    <div id="modConfigStatus" class="hint"></div>
                   </div>
                 </div>
               </div>
@@ -586,9 +546,7 @@
               <h2>Notes</h2>
             </div>
             <ul class="tips">
-              <li>Whitelist on? Add players here or they cannot join.</li>
               <li>Some settings need a restart to apply.</li>
-              <li>Server port changes recreate the container.</li>
             </ul>
           </div>
         </div>
@@ -635,7 +593,7 @@
               <h2>Installed Mods</h2>
             </div>
             <div id="installedMods" class="list"></div>
-            <div class="hint">Install and remove mods for the active server.</div>
+            <div class="hint">Install and remove mods for the selected server.</div>
           </div>
         </div>
       </section>
@@ -648,14 +606,14 @@
             </div>
             <div class="console">
               <div class="console-top">
-                <select id="consoleServerSelect"></select>
+                <div id="consoleServerLabel" class="console-label">No server selected</div>
                 <div class="console-actions">
                   <button id="liveLogsBtn" class="btn">Start live</button>
                   <button id="fetchLogsBtn" class="btn ghost">Fetch logs</button>
                   <button id="clearLogsBtn" class="btn ghost">Clear</button>
                 </div>
               </div>
-              <pre id="logOutput">Select a server and fetch logs.</pre>
+              <pre id="logOutput">Select a server to view logs.</pre>
               <div class="console-command">
                 <input id="commandInput" type="text" placeholder="Type a console command" />
                 <button id="sendCommandBtn" class="btn primary">Send</button>
@@ -700,6 +658,34 @@
             </div>
             <div id="userList" class="list"></div>
             <div class="hint">Owner can create and manage accounts.</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-branding" class="view">
+        <div class="panel-grid">
+          <div class="panel wide">
+            <div class="panel-header">
+              <h2>Branding</h2>
+              <span class="chip">owner only</span>
+            </div>
+            <div class="form-grid">
+              <div class="field">
+                <label>Current logo</label>
+                <div class="branding-preview">
+                  <img id="brandingPreview" class="branding-image" src="/branding/logo.png" alt="Current logo" />
+                </div>
+                <div class="hint">Used for the site logo, browser tab icon, and Minecraft server icon (64×64).</div>
+              </div>
+              <div class="field">
+                <label>Upload new logo</label>
+                <input id="brandingFile" type="file" accept="image/*" />
+                <div class="inline-input">
+                  <button id="brandingUploadBtn" class="btn primary" type="button">Upload</button>
+                </div>
+                <div id="brandingStatus" class="hint"></div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

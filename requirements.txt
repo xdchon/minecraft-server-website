@@ -3,3 +3,5 @@ uvicorn[standard]
 python-dotenv
 docker
 httpx
+python-multipart
+Pillow

@@ -102,6 +102,26 @@ class ModListResponse(BaseModel):
     server_id: str
     mods: list[str]
 
+class ModConfigFileInfo(BaseModel):
+    path: str
+    size_bytes: int
+    modified_at: str
+
+
+class ModConfigListResponse(BaseModel):
+    server_id: str
+    files: list[ModConfigFileInfo]
+
+
+class ModConfigFileResponse(BaseModel):
+    server_id: str
+    path: str
+    content: str
+
+
+class ModConfigUpdateRequest(BaseModel):
+    content: str
+
 
 class ServerCreateResponse(BaseModel):
     message: str

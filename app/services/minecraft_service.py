@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import uuid
+from datetime import datetime, timezone
 from typing import Dict, Iterable, Optional
 
 import logging
@@ -29,7 +30,12 @@ from ..models import (
     ModInstallRequest,
     ModInstallResponse,
     ModListResponse,
+    ModConfigFileInfo,
+    ModConfigFileResponse,
+    ModConfigListResponse,
+    ModConfigUpdateRequest,
 )
+from .branding_service import BrandingError, branding_paths, ensure_branding_assets
 from .modrinth_service import ModrinthError, ModrinthService
 
 
@@ -103,6 +109,19 @@ INT_FIELDS = {
     "server_port",
     "query_port",
 }
+
+MOD_CONFIG_EXTENSIONS = {
+    ".cfg",
+    ".conf",
+    ".json",
+    ".json5",
+    ".properties",
+    ".toml",
+    ".txt",
+    ".yaml",
+    ".yml",
+}
+MOD_CONFIG_MAX_BYTES = 512 * 1024
 
 
 
@@ -217,6 +236,8 @@ class MinecraftService:
 
         try:
             os.makedirs(local_dir, exist_ok=False)
+            self._enforce_open_access(local_dir)
+            self._apply_branding_icon(local_dir)
         except FileExistsError as exc:
             raise ServiceError(409, "Server data directory already exists") from exc
         except OSError as exc:
@@ -224,7 +245,7 @@ class MinecraftService:
 
         container = None
         try:
-            port = self._select_port(request.port)
+            port = self._select_port(None)
             labels = self._labels(
                 server_id,
                 display_name,
@@ -272,6 +293,11 @@ class MinecraftService:
 
     def start_server(self, server_id: str) -> ServerActionResponse:
         container = self._get_container_by_server_id(server_id)
+        container = self._ensure_autopause_env(container, server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        self._enforce_open_access(local_dir)
+        self._apply_branding_icon(local_dir)
         try:
             container.start()
         except DockerException as exc:
@@ -288,6 +314,11 @@ class MinecraftService:
 
     def restart_server(self, server_id: str) -> ServerActionResponse:
         container = self._get_container_by_server_id(server_id)
+        container = self._ensure_autopause_env(container, server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        self._enforce_open_access(local_dir)
+        self._apply_branding_icon(local_dir)
         try:
             container.restart()
         except DockerException as exc:
@@ -360,26 +391,24 @@ class MinecraftService:
         container = self._get_container_by_server_id(server_id)
         local_dir = self._get_local_dir(container, server_id)
         self._validate_local_dir(local_dir)
-        updates = self._settings_to_properties(request)
-        if not updates:
-            raise ServiceError(400, "No settings provided")
 
         if request.server_port is not None:
-            _, current_host_port = self._get_primary_ports(container)
-            used_ports = self._get_used_ports()
-            if current_host_port in used_ports:
-                used_ports.remove(current_host_port)
-            if request.server_port in used_ports:
-                raise ServiceError(409, f"Port {request.server_port} is already in use")
+            raise ServiceError(400, "Server port is managed automatically")
+        if request.server_ip is not None:
+            raise ServiceError(400, "Server IP cannot be set")
+        if request.enable_query is not None or request.query_port is not None:
+            raise ServiceError(400, "Query settings are not configurable")
+
+        updates = self._settings_to_properties(request)
+        updates["white-list"] = "false"
+        updates["enforce-whitelist"] = "false"
+        if not updates:
+            raise ServiceError(400, "No settings provided")
 
         try:
             self._write_server_properties(local_dir, updates)
         except OSError as exc:
             raise ServiceError(500, f"Failed to update server settings: {exc}") from exc
-
-        if request.server_port is not None:
-            self._recreate_container_for_port(container, server_id, request.server_port)
-            return self.get_settings(server_id)
 
         if restart:
             try:
@@ -510,6 +539,119 @@ class MinecraftService:
 
         return self.list_mods(server_id)
 
+    def list_mod_config_files(self, server_id: str) -> ModConfigListResponse:
+        container = self._get_container_by_server_id(server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        self._ensure_modded(container)
+
+        config_dir = os.path.join(local_dir, "config")
+        if not os.path.isdir(config_dir):
+            return ModConfigListResponse(server_id=server_id, files=[])
+
+        root_real = os.path.realpath(config_dir)
+        files: list[ModConfigFileInfo] = []
+        for dirpath, dirnames, filenames in os.walk(config_dir):
+            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+            for name in filenames:
+                if name.startswith("."):
+                    continue
+                ext = os.path.splitext(name)[1].lower()
+                if ext not in MOD_CONFIG_EXTENSIONS:
+                    continue
+                full_path = os.path.join(dirpath, name)
+                if not os.path.isfile(full_path):
+                    continue
+                full_real = os.path.realpath(full_path)
+                if not full_real.startswith(root_real + os.sep):
+                    continue
+                try:
+                    stat = os.stat(full_real)
+                except OSError:
+                    continue
+                rel_path = os.path.relpath(full_real, root_real).replace(os.sep, "/")
+                modified_at = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+                files.append(
+                    ModConfigFileInfo(
+                        path=rel_path,
+                        size_bytes=int(stat.st_size),
+                        modified_at=modified_at,
+                    )
+                )
+
+        files.sort(key=lambda item: item.path.lower())
+        return ModConfigListResponse(server_id=server_id, files=files)
+
+    def get_mod_config_file(self, server_id: str, file_path: str) -> ModConfigFileResponse:
+        container = self._get_container_by_server_id(server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        self._ensure_modded(container)
+
+        config_dir = os.path.join(local_dir, "config")
+        if not os.path.isdir(config_dir):
+            raise ServiceError(409, "Config folder not found. Start the server once to generate configs.")
+        full_path = self._resolve_mod_config_path(config_dir, file_path)
+        if not os.path.isfile(full_path):
+            raise ServiceError(404, "Config file not found")
+
+        try:
+            size = os.path.getsize(full_path)
+        except OSError as exc:
+            raise ServiceError(500, f"Failed to read config file: {exc}") from exc
+        if size > MOD_CONFIG_MAX_BYTES:
+            raise ServiceError(413, f"Config file too large to edit (>{MOD_CONFIG_MAX_BYTES} bytes)")
+
+        try:
+            with open(full_path, "rb") as handle:
+                data = handle.read()
+        except OSError as exc:
+            raise ServiceError(500, f"Failed to read config file: {exc}") from exc
+
+        if b"\x00" in data:
+            raise ServiceError(400, "Config file appears to be binary")
+        content = data.decode("utf-8", errors="replace")
+        rel_path = os.path.relpath(os.path.realpath(full_path), os.path.realpath(config_dir)).replace(os.sep, "/")
+        return ModConfigFileResponse(server_id=server_id, path=rel_path, content=content)
+
+    def update_mod_config_file(
+        self,
+        server_id: str,
+        file_path: str,
+        request: ModConfigUpdateRequest,
+        restart: bool,
+    ) -> ModConfigFileResponse:
+        container = self._get_container_by_server_id(server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        self._ensure_modded(container)
+
+        config_dir = os.path.join(local_dir, "config")
+        if not os.path.isdir(config_dir):
+            raise ServiceError(409, "Config folder not found. Start the server once to generate configs.")
+        full_path = self._resolve_mod_config_path(config_dir, file_path)
+        if not os.path.isfile(full_path):
+            raise ServiceError(404, "Config file not found")
+
+        content = request.content or ""
+        encoded = content.encode("utf-8")
+        if len(encoded) > MOD_CONFIG_MAX_BYTES:
+            raise ServiceError(413, f"Config content too large (>{MOD_CONFIG_MAX_BYTES} bytes)")
+
+        try:
+            with open(full_path, "w", encoding="utf-8") as handle:
+                handle.write(content)
+        except OSError as exc:
+            raise ServiceError(500, f"Failed to save config file: {exc}") from exc
+
+        if restart:
+            try:
+                container.restart()
+            except DockerException as exc:
+                raise ServiceError(500, f"Failed to restart server: {exc}") from exc
+
+        return self.get_mod_config_file(server_id, file_path)
+
     def _ensure_data_root(self) -> None:
         try:
             os.makedirs(settings.data_root, exist_ok=True)
@@ -606,16 +748,91 @@ class MinecraftService:
     ) -> Dict[str, str]:
         env = dict(request.env)
         env["EULA"] = "TRUE" if request.eula else "FALSE"
+        env.pop("SERVER_IP", None)
+        env.pop("ENABLE_QUERY", None)
+        env.pop("QUERY_PORT", None)
         if request.version:
             env["VERSION"] = request.version
         if request.server_type:
             env["TYPE"] = request.server_type.upper()
         env["MEMORY"] = f"{memory_mb}M"
         env["SERVER_PORT"] = str(server_port)
+        env["WHITELIST"] = "FALSE"
+        env["ENFORCE_WHITELIST"] = "FALSE"
+        if settings.autopause_enabled:
+            env["ENABLE_AUTOPAUSE"] = "TRUE"
+            env["AUTOPAUSE_TIMEOUT_EST"] = str(settings.autopause_timeout_seconds)
+            env["AUTOPAUSE_TIMEOUT_INIT"] = str(settings.autopause_timeout_seconds)
+            env["AUTOPAUSE_PERIOD"] = str(settings.autopause_period_seconds)
+        else:
+            env["ENABLE_AUTOPAUSE"] = "FALSE"
         if enable_rcon:
             env["ENABLE_RCON"] = "TRUE"
             env["RCON_PASSWORD"] = rcon_password or ""
         return env
+
+    def _enforce_open_access(self, local_dir: str) -> None:
+        try:
+            self._write_server_properties(
+                local_dir,
+                {"white-list": "false", "enforce-whitelist": "false"},
+            )
+        except OSError as exc:
+            raise ServiceError(500, f"Failed to enforce open access: {exc}") from exc
+
+    def _apply_branding_icon(self, local_dir: str) -> None:
+        try:
+            ensure_branding_assets()
+            icon_src = branding_paths().server_icon_path
+        except BrandingError as exc:
+            self.log.warning("Branding unavailable: %s", exc.message)
+            return
+
+        if not os.path.exists(icon_src):
+            return
+        dest = os.path.join(local_dir, "server-icon.png")
+        try:
+            shutil.copyfile(icon_src, dest)
+        except OSError as exc:
+            self.log.warning("Failed to write server icon: %s", exc)
+
+    def apply_branding_to_all_servers(self) -> int:
+        try:
+            ensure_branding_assets()
+            icon_src = branding_paths().server_icon_path
+        except BrandingError as exc:
+            raise ServiceError(exc.status_code, exc.message) from exc
+
+        if not os.path.exists(icon_src):
+            return 0
+
+        try:
+            containers = docker_client.containers.list(
+                all=True,
+                filters={"label": f"{settings.managed_label}={settings.managed_label_value}"},
+            )
+        except DockerException as exc:
+            raise ServiceError(503, f"Docker unavailable: {exc}") from exc
+
+        updated = 0
+        for container in containers:
+            labels = container.labels or {}
+            server_id = labels.get("mc.server_id") or ""
+            if not server_id:
+                continue
+            local_dir = self._get_local_dir(container, server_id)
+            try:
+                self._validate_local_dir(local_dir)
+            except ServiceError:
+                continue
+            dest = os.path.join(local_dir, "server-icon.png")
+            try:
+                shutil.copyfile(icon_src, dest)
+                updated += 1
+            except OSError:
+                continue
+
+        return updated
 
     def _resolve_rcon(self, request: ServerCreateRequest) -> tuple[bool, Optional[str]]:
         if request.enable_rcon is None:
@@ -687,6 +904,22 @@ class MinecraftService:
         target = os.path.realpath(path)
         if not target.startswith(root + os.sep):
             raise ServiceError(400, "Server data path is invalid")
+
+    def _resolve_mod_config_path(self, config_dir: str, file_path: str) -> str:
+        raw = (file_path or "").strip().replace("\\", "/").lstrip("/")
+        normalized = os.path.normpath(raw).replace("\\", "/")
+        if normalized in {"", ".", ".."} or normalized.startswith("../"):
+            raise ServiceError(400, "Invalid config file path")
+
+        ext = os.path.splitext(normalized)[1].lower()
+        if ext not in MOD_CONFIG_EXTENSIONS:
+            raise ServiceError(400, "Unsupported config file type")
+
+        root_real = os.path.realpath(config_dir)
+        full_real = os.path.realpath(os.path.join(root_real, normalized))
+        if not full_real.startswith(root_real + os.sep):
+            raise ServiceError(400, "Invalid config file path")
+        return full_real
 
     def _read_server_properties(self, local_dir: str) -> Dict[str, str]:
         path = os.path.join(local_dir, "server.properties")
@@ -864,6 +1097,72 @@ class MinecraftService:
                 labels=labels,
                 mem_limit=f"{memory_mb}m",
             )
+        except DockerException as exc:
+            raise ServiceError(500, f"Failed to recreate container: {exc}") from exc
+
+    def _ensure_autopause_env(self, container, server_id: str):
+        if not settings.autopause_enabled:
+            return container
+
+        env = self._container_env_dict(container)
+        desired = {
+            "ENABLE_AUTOPAUSE": "TRUE",
+            "AUTOPAUSE_TIMEOUT_EST": str(settings.autopause_timeout_seconds),
+            "AUTOPAUSE_TIMEOUT_INIT": str(settings.autopause_timeout_seconds),
+            "AUTOPAUSE_PERIOD": str(settings.autopause_period_seconds),
+        }
+        needs_update = any(env.get(key) != value for key, value in desired.items())
+        if not needs_update:
+            return container
+
+        env.update(desired)
+        started = (container.status or "").lower() == "running"
+        self._recreate_container_with_env(container, server_id, env, start=started)
+        return self._get_container_by_server_id(server_id)
+
+    def _recreate_container_with_env(
+        self,
+        container,
+        server_id: str,
+        env: Dict[str, str],
+        start: bool,
+    ) -> None:
+        container.reload()
+        container_port, host_port = self._get_primary_ports(container)
+        if host_port is None:
+            raise ServiceError(500, "Unable to determine server port for container recreation")
+        container_port = container_port or host_port
+
+        labels = dict(container.labels or {})
+        host_dir = labels.get("mc.server_dir") or self._server_dir(settings.host_data_root, server_id)
+        if not host_dir:
+            raise ServiceError(500, "Missing server data path for container recreation")
+
+        memory_label = labels.get("mc.memory_mb")
+        if memory_label and memory_label.isdigit():
+            memory_mb = int(memory_label)
+        else:
+            memory_mb = settings.default_memory_mb
+
+        image_tag = container.image.tags[0] if container.image.tags else container.image.id
+        container_name = container.name
+
+        try:
+            if container.status == "running":
+                container.stop()
+            container.remove()
+            new_container = docker_client.containers.create(
+                image_tag,
+                name=container_name,
+                detach=True,
+                ports={f"{container_port}/tcp": host_port},
+                volumes={host_dir: {"bind": "/data", "mode": "rw"}},
+                environment=env,
+                labels=labels,
+                mem_limit=f"{memory_mb}m",
+            )
+            if start:
+                new_container.start()
         except DockerException as exc:
             raise ServiceError(500, f"Failed to recreate container: {exc}") from exc
 

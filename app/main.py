@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 
-from fastapi import FastAPI, Query, Request, Response
+from fastapi import FastAPI, File, Query, Request, Response, UploadFile
 from fastapi.responses import (
     FileResponse,
     JSONResponse,
@@ -32,11 +32,21 @@ from .models import (
     ModInstallRequest,
     ModInstallResponse,
     ModListResponse,
+    ModConfigListResponse,
+    ModConfigFileResponse,
+    ModConfigUpdateRequest,
     ModSearchResponse,
     ModVersionResponse,
 )
 from .services.minecraft_service import MinecraftService, ServiceError
 from .services.modrinth_service import ModrinthError, ModrinthService
+from .services.branding_service import (
+    BrandingError,
+    branding_paths,
+    ensure_branding_assets,
+    read_branding_version,
+    update_logo,
+)
 
 app = FastAPI(title="Minecraft Docker Manager")
 modrinth = ModrinthService()
@@ -51,6 +61,7 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 def startup() -> None:
     auth_service.init_db()
     auth_service.ensure_owner_bootstrap()
+    ensure_branding_assets()
     service.start_dns_reconciler()
 
 
@@ -58,6 +69,8 @@ def startup() -> None:
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
     if path.startswith("/static") or path in {"/login", "/auth/login", "/auth/logout"}:
+        return await call_next(request)
+    if path.startswith("/branding") and request.method == "GET":
         return await call_next(request)
 
     user = auth_service.get_user_from_request(request)
@@ -145,6 +158,11 @@ def modrinth_error_handler(request: Request, exc: ModrinthError) -> JSONResponse
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 
 
+@app.exception_handler(BrandingError)
+def branding_error_handler(request: Request, exc: BrandingError) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
+
+
 def _require_user(request: Request) -> AuthUser:
     user = getattr(request.state, "user", None)
     if not user:
@@ -157,6 +175,59 @@ def _require_owner(request: Request) -> AuthUser:
     if user.role != "owner":
         raise ServiceError(403, "Owner permissions required")
     return user
+
+
+@app.get("/branding/version")
+def branding_version() -> JSONResponse:
+    return JSONResponse(content={"version": read_branding_version()})
+
+
+@app.get("/branding/logo.png")
+def branding_logo() -> FileResponse:
+    paths = branding_paths()
+    return FileResponse(
+        paths.logo_path,
+        media_type="image/png",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/branding/server-icon.png")
+def branding_server_icon() -> FileResponse:
+    paths = branding_paths()
+    return FileResponse(
+        paths.server_icon_path,
+        media_type="image/png",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/branding/favicon.png")
+def branding_favicon() -> FileResponse:
+    paths = branding_paths()
+    return FileResponse(
+        paths.favicon_path,
+        media_type="image/png",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@app.post("/branding/logo")
+def upload_branding_logo(request: Request, file: UploadFile = File(...)) -> JSONResponse:
+    _require_owner(request)
+    try:
+        data = file.file.read()
+    except Exception as exc:
+        raise BrandingError(400, f"Failed to read upload: {exc}") from exc
+    update_logo(data)
+    updated = service.apply_branding_to_all_servers()
+    return JSONResponse(
+        content={
+            "message": "logo updated",
+            "version": read_branding_version(),
+            "servers_updated": updated,
+        }
+    )
 
 
 @app.get("/servers", response_model=list[ServerInfo])
@@ -280,3 +351,29 @@ def remove_mod(
     restart: bool = Query(False),
 ) -> ModListResponse:
     return service.remove_mod(server_id, filename, restart)
+
+
+@app.get("/servers/{server_id}/mod-settings", response_model=ModConfigListResponse)
+def list_mod_settings(server_id: str) -> ModConfigListResponse:
+    return service.list_mod_config_files(server_id)
+
+
+@app.get(
+    "/servers/{server_id}/mod-settings/{file_path:path}",
+    response_model=ModConfigFileResponse,
+)
+def get_mod_setting_file(server_id: str, file_path: str) -> ModConfigFileResponse:
+    return service.get_mod_config_file(server_id, file_path)
+
+
+@app.put(
+    "/servers/{server_id}/mod-settings/{file_path:path}",
+    response_model=ModConfigFileResponse,
+)
+def update_mod_setting_file(
+    server_id: str,
+    file_path: str,
+    request: ModConfigUpdateRequest,
+    restart: bool = Query(False),
+) -> ModConfigFileResponse:
+    return service.update_mod_config_file(server_id, file_path, request, restart=restart)

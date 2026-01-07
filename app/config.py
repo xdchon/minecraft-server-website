@@ -55,6 +55,9 @@ class Settings:
     cf_zone_id: str | None
     cf_zone_name: str | None
     dns_reconcile_interval_seconds: int
+    autopause_enabled: bool
+    autopause_timeout_seconds: int
+    autopause_period_seconds: int
 
 
 
@@ -88,6 +91,9 @@ def load_settings() -> Settings:
         cf_zone_id=os.getenv("CF_ZONE_ID") or None,
         cf_zone_name=os.getenv("CF_ZONE_NAME") or None,
         dns_reconcile_interval_seconds=_get_env_int("DNS_RECONCILE_INTERVAL_SECONDS", 60),
+        autopause_enabled=_get_env_bool("AUTOPAUSE_ENABLED", True),
+        autopause_timeout_seconds=_get_env_int("AUTOPAUSE_TIMEOUT_SECONDS", 300),
+        autopause_period_seconds=_get_env_int("AUTOPAUSE_PERIOD_SECONDS", 10),
     )
 
 
