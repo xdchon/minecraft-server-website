@@ -277,7 +277,7 @@ body.console-mode .view {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden !important;
+  overflow: hidden;
 }
 
 @keyframes view-enter {
@@ -362,7 +362,7 @@ body.console-mode .view {
   border-style: solid;
   border-color: transparent;
   border-width: calc(var(--block-size) / var(--zoom));
-  border-image: url("/imgs/ui/button-border.png");
+  border-image-source: url("/imgs/ui/button-border.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 10% 3%;
   border-image-repeat: stretch;
@@ -387,10 +387,7 @@ body.console-mode .view {
 .nav-item:hover,
 .tab:hover {
   background-image: url("/imgs/ui/button-inside-hover.png");
-  border-image: url(/imgs/ui/button-border-hover-white.png);
-  border-image-width: calc(var(--block-size) / var(--zoom));
-  border-image-slice: 10% 3%;
-  border-image-repeat: stretch;
+  border-image-source: url("/imgs/ui/button-border-hover-white.png");
   color: var(--mc-gold);
 }
 
@@ -398,10 +395,7 @@ body.console-mode .view {
 .nav-item:active,
 .tab:active {
   background-image: url("/imgs/ui/button-inside-active.png");
-  border-image: url("/imgs/ui/button-border-active.png");
-  border-image-width: calc(var(--block-size) / var(--zoom));
-  border-image-slice: 10% 3%;
-  border-image-repeat: stretch;
+  border-image-source: url("/imgs/ui/button-border-active.png");
   color: #a8a29e;
 }
 
@@ -409,14 +403,14 @@ body.console-mode .view {
 .nav-item:focus-visible,
 .tab:focus-visible {
   background-image: url("/imgs/ui/button-inside-hover.png");
-  border-image: url("/imgs/ui/button-border-hover.png");
+  border-image-source: url("/imgs/ui/button-border-hover-white.png");
   color: var(--mc-gold);
 }
 
 .nav-item.active,
 .tab.active {
   background-image: url("/imgs/ui/button-inside-active.png");
-  border-image: url("/imgs/ui/button-border-active.png");
+  border-image-source: url("/imgs/ui/button-border-active.png");
   color: var(--mc-gold);
 }
 
@@ -483,7 +477,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/raised-slot.png");
+  border-image-source: url("/imgs/ui/raised-slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -491,11 +485,11 @@ body.console-mode .view {
 }
 
 .server-card:hover {
-  border-image: url("/imgs/ui/raised-slot-hover.png");
+  border-image-source: url("/imgs/ui/raised-slot-hover.png");
 }
 
 .server-card.active {
-  border-image: url("/imgs/ui/raised-slot-active.png");
+  border-image-source: url("/imgs/ui/raised-slot-active.png");
 }
 
 .server-card.skeleton {
@@ -707,7 +701,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/anvil-textbox.png");
+  border-image-source: url("/imgs/ui/anvil-textbox.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 40% 40% fill;
   border-image-repeat: stretch;
@@ -760,7 +754,7 @@ body.console-mode .view {
 .console-top select:focus,
 .console-command input:focus,
 .login-card input:focus {
-  border-image: url("/imgs/ui/anvil-textbox-active.png");
+  border-image-source: url("/imgs/ui/anvil-textbox-active.png");
 }
 
 .console-label {
@@ -836,14 +830,14 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/slot.png");
+  border-image-source: url("/imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
 }
 
 .list-item.active {
-  border-image: url("/imgs/ui/raised-slot-active.png");
+  border-image-source: url("/imgs/ui/raised-slot-active.png");
 }
 
 .list-item.disabled {
@@ -990,7 +984,8 @@ body.console-mode .view {
 
 #logOutput {
   margin: 0;
-  min-height: 200px;
+  flex: 1 1 0;
+  min-height: 0;
   padding: 12px;
   --zoom: 10;
   border-width: calc(var(--block-size) / var(--zoom));
@@ -1019,27 +1014,17 @@ body.console-mode .view {
   grid-auto-rows: minmax(0, 1fr);
   flex: 1;
   min-height: 0;
-  overflow: hidden !important;
+  overflow: hidden;
 }
 
 #view-console .panel {
-  overflow: hidden !important;
+  overflow: hidden;
 }
 
 #view-console .console {
   flex: 1;
   min-height: 0;
-  overflow: hidden !important;
-}
-
-#view-console #logOutput {
-  overflow: auto !important;
-}
-
-#logOutput {
-  flex: 1 1 0;
-  min-height: 0;
-  max-height: none;
+  overflow: hidden;
 }
 
 .toast {
@@ -1109,7 +1094,7 @@ body.console-mode .view {
 .login-card .field input {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
-  border-image: url("/imgs/ui/enchanting-slot.png");
+  border-image-source: url("/imgs/ui/enchanting-slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -1122,7 +1107,7 @@ body.console-mode .view {
 }
 
 .login-card .field input:focus {
-  border-image: url("/imgs/ui/enchanting-slot-active.png");
+  border-image-source: url("/imgs/ui/enchanting-slot-active.png");
   background-color: rgba(0, 0, 0, 0.25);
 }
 
