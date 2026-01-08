@@ -42,6 +42,22 @@ body {
   overflow: hidden;
 }
 
+body.console-mode {
+  overflow: hidden;
+}
+
+body.console-mode .layout {
+  height: 100vh;
+}
+
+body.console-mode .main {
+  height: 100%;
+}
+
+body.console-mode .view {
+  min-height: 0;
+}
+
 .bg {
   position: fixed;
   inset: 0;
@@ -257,6 +273,13 @@ body {
   will-change: transform, opacity;
 }
 
+#view-console.view.active {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden !important;
+}
+
 @keyframes view-enter {
   from {
     opacity: 0;
@@ -330,7 +353,6 @@ body {
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
 }
-
 .btn,
 .nav-item,
 .tab {
@@ -365,7 +387,10 @@ body {
 .nav-item:hover,
 .tab:hover {
   background-image: url("/imgs/ui/button-inside-hover.png");
-  border-image: url("/imgs/ui/button-border-hover.png");
+  border-image: url(/imgs/ui/button-border-hover-white.png);
+  border-image-width: calc(var(--block-size) / var(--zoom));
+  border-image-slice: 10% 3%;
+  border-image-repeat: stretch;
   color: var(--mc-gold);
 }
 
@@ -374,6 +399,9 @@ body {
 .tab:active {
   background-image: url("/imgs/ui/button-inside-active.png");
   border-image: url("/imgs/ui/button-border-active.png");
+  border-image-width: calc(var(--block-size) / var(--zoom));
+  border-image-slice: 10% 3%;
+  border-image-repeat: stretch;
   color: #a8a29e;
 }
 
@@ -758,10 +786,6 @@ body {
   user-select: none;
 }
 
-.toggle:hover {
-  border-image: url("/imgs/ui/raised-slot-hover.png");
-}
-
 .toggle input {
   width: 18px;
   height: 18px;
@@ -965,6 +989,7 @@ body {
 }
 
 #logOutput {
+  margin: 0;
   min-height: 200px;
   padding: 12px;
   --zoom: 10;
@@ -981,12 +1006,40 @@ body {
     "Courier New", monospace;
   font-size: 12px;
   overflow: auto;
+  overscroll-behavior: contain;
   text-shadow: none;
 }
 
 .console-command {
   display: flex;
   gap: 10px;
+}
+
+#view-console .panel-grid {
+  grid-auto-rows: minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden !important;
+}
+
+#view-console .panel {
+  overflow: hidden !important;
+}
+
+#view-console .console {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden !important;
+}
+
+#view-console #logOutput {
+  overflow: auto !important;
+}
+
+#logOutput {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none;
 }
 
 .toast {

@@ -9,6 +9,7 @@ from fastapi.responses import (
     RedirectResponse,
     StreamingResponse,
 )
+from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
@@ -57,11 +58,13 @@ metadata = MetadataService()
 auth_service = AuthService()
 base_dir = os.path.dirname(os.path.abspath(__file__))
 static_dir = os.path.join(base_dir, "static")
+templates_dir = os.path.join(base_dir, "templates")
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 theme_dir = os.path.join(static_dir, "minecraft-theme")
 app.mount("/css", StaticFiles(directory=os.path.join(theme_dir, "css")), name="theme-css")
 app.mount("/fonts", StaticFiles(directory=os.path.join(theme_dir, "fonts")), name="theme-fonts")
 app.mount("/imgs", StaticFiles(directory=os.path.join(theme_dir, "imgs")), name="theme-imgs")
+templates = Jinja2Templates(directory=templates_dir)
 
 
 @app.on_event("startup")
@@ -97,17 +100,17 @@ async def auth_middleware(request: Request, call_next):
 
 
 @app.get("/")
-def index() -> FileResponse:
-    return FileResponse(os.path.join(static_dir, "index.html"))
+def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/panel")
-def panel_root() -> FileResponse:
-    return index()
+def panel_root(request: Request):
+    return index(request)
 
 
 @app.get("/panel/{path:path}")
-def panel_page(path: str) -> FileResponse:
-    return index()
+def panel_page(request: Request, path: str):
+    return index(request)
 
 
 @app.get("/login")

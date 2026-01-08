@@ -1,0 +1,206 @@
+      <section id="view-create" class="view">
+        <div class="panel-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Create Server</h2>
+              <span class="chip">new instance</span>
+            </div>
+            <form id="createForm" class="form">
+              <div class="tabs">
+                <button class="tab active" data-tab="create-essentials" type="button">Essentials</button>
+                <button class="tab" data-tab="create-gameplay" type="button">Gameplay</button>
+                <button class="tab" data-tab="create-world" type="button">World</button>
+                <button class="tab" data-tab="create-access" type="button">Access</button>
+                <button class="tab" data-tab="create-performance" type="button">Performance</button>
+              </div>
+
+              <div class="tab-content active" data-tab-panel="create-essentials">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Server name</label>
+                    <input id="createName" type="text" placeholder="My friends SMP" required />
+                  </div>
+                  <div class="field">
+                    <label>Minecraft version</label>
+                    <select id="createVersion">
+                      <option value="" selected>Latest</option>
+                      <option value="1.21.4">1.21.4</option>
+                      <option value="1.21.3">1.21.3</option>
+                      <option value="1.21.2">1.21.2</option>
+                      <option value="1.21.1">1.21.1</option>
+                      <option value="1.21">1.21</option>
+                      <option value="1.20.6">1.20.6</option>
+                      <option value="1.20.4">1.20.4</option>
+                      <option value="1.20.1">1.20.1</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Server type</label>
+                    <select id="createType">
+                      <option value="VANILLA">Vanilla</option>
+                      <option value="PAPER">Paper</option>
+                      <option value="FABRIC">Fabric</option>
+                      <option value="FORGE">Forge</option>
+                    </select>
+                  </div>
+                  <div class="field" id="createFabricLoaderWrap" hidden>
+                    <label>Fabric loader version</label>
+                    <select id="createFabricLoaderVersion">
+                      <option value="" selected>Latest (recommended)</option>
+                    </select>
+                    <div class="hint">Optional. Leave as Latest unless you need a specific loader version.</div>
+                  </div>
+                  <div class="field">
+                    <label>Memory (GB)</label>
+                    <div class="mc-slider-wrap">
+                      <input id="createMemory" class="mc-slider" type="range" min="1" max="9" step="1" value="2" />
+                      <div class="mc-slider-thumb" aria-hidden="true"></div>
+                    </div>
+                    <div id="createMemoryValue" class="hint">2 GB (2048 MB)</div>
+                  </div>
+                  <div class="field">
+                    <label>Message of the day</label>
+                    <input id="createMotd" type="text" placeholder="Welcome to MCServer" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="create-gameplay">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Gamemode</label>
+                    <select id="createGamemode">
+                      <option value="survival">Survival</option>
+                      <option value="creative">Creative</option>
+                      <option value="adventure">Adventure</option>
+                      <option value="spectator">Spectator</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Difficulty</label>
+                    <select id="createDifficulty">
+                      <option value="peaceful">Peaceful</option>
+                      <option value="easy">Easy</option>
+                      <option value="normal" selected>Normal</option>
+                      <option value="hard">Hard</option>
+                    </select>
+                  </div>
+                  <label class="toggle">
+                    <input id="createPvp" type="checkbox" checked />
+                    <span>PVP enabled</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createHardcore" type="checkbox" />
+                    <span>Hardcore mode</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createAllowNether" type="checkbox" checked />
+                    <span>Allow Nether</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createAllowEnd" type="checkbox" checked />
+                    <span>Allow End</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createCommandBlocks" type="checkbox" />
+                    <span>Enable command blocks</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="create-world">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>World seed</label>
+                    <input id="createLevelSeed" type="text" placeholder="Leave blank for random" />
+                  </div>
+                  <div class="field">
+                    <label>World type</label>
+                    <input id="createLevelType" type="text" placeholder="default, flat, largebiomes" />
+                  </div>
+                  <div class="field">
+                    <label>Spawn protection</label>
+                    <input id="createSpawnProtection" type="number" min="0" max="64" value="16" />
+                  </div>
+                  <label class="toggle">
+                    <input id="createSpawnAnimals" type="checkbox" checked />
+                    <span>Spawn animals</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createSpawnMonsters" type="checkbox" checked />
+                    <span>Spawn monsters</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="createSpawnNpcs" type="checkbox" checked />
+                    <span>Spawn NPCs</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="create-access">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Max players</label>
+                    <div class="mc-slider-wrap">
+                      <input id="createMaxPlayers" class="mc-slider" type="range" min="1" max="50" step="1" value="20" />
+                      <div class="mc-slider-thumb" aria-hidden="true"></div>
+                    </div>
+                    <div id="createMaxPlayersValue" class="hint">20</div>
+                  </div>
+                  <div class="field">
+                    <label>OP permission level</label>
+                    <select id="createOpPermissionLevel">
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4" selected>4</option>
+                    </select>
+                  </div>
+                  <label class="toggle">
+                    <input id="createOnlineMode" type="checkbox" checked />
+                    <span>Online mode (auth)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="create-performance">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>View distance</label>
+                    <input id="createViewDistance" type="number" min="4" max="32" value="32" />
+                  </div>
+                  <div class="field">
+                    <label>Simulation distance</label>
+                    <input id="createSimulationDistance" type="number" min="4" max="32" value="10" />
+                  </div>
+                  <div class="field">
+                    <label>Max tick time</label>
+                    <input id="createMaxTickTime" type="number" value="60000" />
+                  </div>
+                  <div class="field">
+                    <label>Entity broadcast range (%)</label>
+                    <input id="createEntityBroadcastRange" type="number" min="10" max="500" value="100" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-footer">
+                <label class="toggle">
+                  <input id="createEula" type="checkbox" checked />
+                  <span>I accept the Minecraft EULA</span>
+                </label>
+                <button type="submit" class="btn primary">Create server</button>
+              </div>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Tips</h2>
+            </div>
+            <ul class="tips">
+              <li>Fabric and Forge allow mods. Vanilla and Paper are plugin-friendly.</li>
+              <li>Use Mods tab to search Modrinth and install with one click.</li>
+            </ul>
+          </div>
+        </div>
+      </section>

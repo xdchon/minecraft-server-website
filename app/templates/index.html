@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MCServer Control Panel</title>
+  <link id="faviconLink" rel="icon" type="image/png" href="/branding/favicon.png" />
+  <link rel="stylesheet" href="/css/minecraft.css" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="bg" id="bg">
+    <div class="bg-layer bg-layer-a"></div>
+    <div class="bg-layer bg-layer-b"></div>
+  </div>
+  <div class="layout">
+    <aside class="sidebar panel-dark">
+      <div class="brand">
+        <img id="brandLogo" class="brand-logo" src="/branding/logo.png" alt="Logo" />
+        <div class="brand-text">
+          <div class="logo">MCServer</div>
+          <div class="logo-sub">Private Minecraft Studio</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-view="view-servers">Servers</button>
+        <button class="nav-item" data-view="view-create">Create</button>
+        <button class="nav-item" data-view="view-settings">Settings</button>
+        <button class="nav-item" data-view="view-mods">Mods</button>
+        <button class="nav-item" data-view="view-console">Console</button>
+        <button class="nav-item" data-view="view-branding" id="navBranding" hidden>Branding</button>
+        <button class="nav-item" data-view="view-users" id="navUsers" hidden>Users</button>
+      </nav>
+      <div class="sidebar-card" id="userCard">
+        <div class="sidebar-title">Signed in</div>
+        <div class="sidebar-metric" id="userName">-</div>
+        <div class="sidebar-metric" id="userRole">-</div>
+        <button id="logoutBtn" class="btn ghost small">Log out</button>
+      </div>
+      <div class="sidebar-card">
+        <div class="sidebar-title">Fleet Status</div>
+        <div class="sidebar-metric" id="countTotal">0 total</div>
+        <div class="sidebar-metric" id="countRunning">0 running</div>
+        <div class="sidebar-metric" id="countStopped">0 stopped</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar panel-dark">
+        <div class="active-server">
+          <div class="label">Selected server</div>
+          <div id="activeServerName" class="value">No server selected</div>
+          <div id="activeServerMeta" class="meta">Select a server from the list.</div>
+        </div>
+        <div class="top-actions">
+          <button id="refreshBtn" class="btn ghost">Refresh</button>
+          <button id="startBtn" class="btn">Start</button>
+          <button id="stopBtn" class="btn">Stop</button>
+          <button id="restartBtn" class="btn">Restart</button>
+        </div>
+      </header>
+
+      {% include "views/view-servers.html" %}
+
+      {% include "views/view-create.html" %}
+
+      {% include "views/view-settings.html" %}
+
+      {% include "views/view-mods.html" %}
+
+      {% include "views/view-console.html" %}
+
+      {% include "views/view-users.html" %}
+
+      {% include "views/view-branding.html" %}
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script src="/static/background.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

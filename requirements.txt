@@ -5,3 +5,4 @@ docker
 httpx
 python-multipart
 Pillow
+Jinja2

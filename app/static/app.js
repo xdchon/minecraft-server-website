@@ -406,6 +406,7 @@ function showView(viewId) {
   const nav = Array.from(navItems).find((item) => item.dataset.view === viewId);
   if (nav) nav.classList.add("active");
   activeViewId = viewId;
+  document.body.classList.toggle("console-mode", viewId === "view-console");
   if (viewId === "view-settings") {
     loadSettings();
   }

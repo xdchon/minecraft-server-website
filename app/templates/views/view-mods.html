@@ -1,0 +1,45 @@
+      <section id="view-mods" class="view">
+        <div class="panel-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Modrinth Search</h2>
+              <span class="chip">Fabric first</span>
+            </div>
+            <div class="form-grid">
+              <div class="field">
+                <label>Search</label>
+                <input id="modSearchInput" type="text" placeholder="Search mods" />
+              </div>
+              <div class="field">
+                <label>Loader</label>
+                <select id="modLoader">
+                  <option value="fabric" selected>Fabric</option>
+                  <option value="forge">Forge</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Game version</label>
+                <input id="modGameVersion" type="text" placeholder="1.20.4" />
+              </div>
+              <div class="field">
+                <label>Restart after install</label>
+                <select id="modRestart">
+                  <option value="true" selected>Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </div>
+              <div class="field">
+                <button id="modSearchBtn" class="btn primary" type="button">Search Modrinth</button>
+              </div>
+            </div>
+            <div id="modSearchResults" class="list"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Installed Mods</h2>
+            </div>
+            <div id="installedMods" class="list"></div>
+            <div class="hint">Install and remove mods for the selected server.</div>
+          </div>
+        </div>
+      </section>

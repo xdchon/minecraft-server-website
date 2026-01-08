@@ -1,0 +1,206 @@
+      <section id="view-settings" class="view">
+        <div class="panel-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Settings</h2>
+              <span id="settingsServerBadge" class="chip">No server</span>
+            </div>
+            <div class="tabs">
+              <button class="tab active" data-tab="settings-gameplay" type="button">Gameplay</button>
+              <button class="tab" data-tab="settings-world" type="button">World</button>
+              <button class="tab" data-tab="settings-access" type="button">Access</button>
+              <button class="tab" data-tab="settings-performance" type="button">Performance</button>
+              <button class="tab" data-tab="settings-modconfig" type="button">Mod Config</button>
+              <button class="tab" data-tab="settings-danger" type="button">Danger</button>
+            </div>
+            <form id="settingsForm" class="form">
+              <div class="tab-content active" data-tab-panel="settings-gameplay">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Message of the day</label>
+                    <input id="settingsMotd" type="text" />
+                  </div>
+                  <div class="field">
+                    <label>Gamemode</label>
+                    <select id="settingsGamemode">
+                      <option value="survival">Survival</option>
+                      <option value="creative">Creative</option>
+                      <option value="adventure">Adventure</option>
+                      <option value="spectator">Spectator</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Difficulty</label>
+                    <select id="settingsDifficulty">
+                      <option value="peaceful">Peaceful</option>
+                      <option value="easy">Easy</option>
+                      <option value="normal">Normal</option>
+                      <option value="hard">Hard</option>
+                    </select>
+                  </div>
+                  <label class="toggle">
+                    <input id="settingsPvp" type="checkbox" />
+                    <span>PVP enabled</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsHardcore" type="checkbox" />
+                    <span>Hardcore mode</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsAllowNether" type="checkbox" />
+                    <span>Allow Nether</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsAllowEnd" type="checkbox" />
+                    <span>Allow End</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsCommandBlocks" type="checkbox" />
+                    <span>Enable command blocks</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="settings-world">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>World seed</label>
+                    <input id="settingsLevelSeed" type="text" placeholder="Random (leave blank)" />
+                    <div class="hint">Default: random</div>
+                  </div>
+                  <div class="field">
+                    <label>World type</label>
+                    <input id="settingsLevelType" type="text" placeholder="minecraft:normal" />
+                    <div class="hint">Default: minecraft:normal</div>
+                  </div>
+                  <div class="field">
+                    <label>Spawn protection</label>
+                    <input id="settingsSpawnProtection" type="number" min="0" max="64" />
+                  </div>
+                  <label class="toggle">
+                    <input id="settingsSpawnAnimals" type="checkbox" />
+                    <span>Spawn animals</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsSpawnMonsters" type="checkbox" />
+                    <span>Spawn monsters</span>
+                  </label>
+                  <label class="toggle">
+                    <input id="settingsSpawnNpcs" type="checkbox" />
+                    <span>Spawn NPCs</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="settings-access">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>Max players</label>
+                    <div class="mc-slider-wrap">
+                      <input id="settingsMaxPlayers" class="mc-slider" type="range" min="1" max="50" step="1" value="20" />
+                      <div class="mc-slider-thumb" aria-hidden="true"></div>
+                    </div>
+                    <div id="settingsMaxPlayersValue" class="hint">20</div>
+                  </div>
+                  <div class="field">
+                    <label>OP permission level</label>
+                    <select id="settingsOpPermissionLevel">
+                      <option value="1">1</option>
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                    </select>
+                  </div>
+                  <label class="toggle">
+                    <input id="settingsOnlineMode" type="checkbox" />
+                    <span>Online mode (auth)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="settings-performance">
+                <div class="form-grid">
+                  <div class="field">
+                    <label>View distance</label>
+                    <input id="settingsViewDistance" type="number" min="4" max="32" />
+                  </div>
+                  <div class="field">
+                    <label>Simulation distance</label>
+                    <input id="settingsSimulationDistance" type="number" min="4" max="32" />
+                  </div>
+                  <div class="field">
+                    <label>Max tick time</label>
+                    <input id="settingsMaxTickTime" type="number" />
+                  </div>
+                  <div class="field">
+                    <label>Entity broadcast range (%)</label>
+                    <input id="settingsEntityBroadcastRange" type="number" min="10" max="500" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="settings-modconfig">
+                <div class="mod-config-grid">
+                  <div class="mod-config-list">
+                    <div class="field">
+                      <label>Config files</label>
+                      <input id="modConfigFilter" type="text" placeholder="Filter config files" />
+                      <div class="hint">Edit text files under <code>/config</code> for this server.</div>
+                    </div>
+                    <div id="modConfigList" class="list"></div>
+                  </div>
+                  <div class="mod-config-editor">
+                    <div class="mod-config-header">
+                      <span id="modConfigPath" class="chip">No file selected</span>
+                      <div class="mod-config-actions">
+                        <select id="modConfigRestart">
+                          <option value="true" selected>Restart after save</option>
+                          <option value="false">Don't restart</option>
+                        </select>
+                        <button id="modConfigReloadBtn" class="btn ghost" type="button" disabled>Reload</button>
+                        <button id="modConfigSaveBtn" class="btn primary" type="button" disabled>Save</button>
+                      </div>
+                    </div>
+                    <textarea id="modConfigEditor" class="config-editor" spellcheck="false" placeholder="Select a config file to edit…" disabled></textarea>
+                    <div id="modConfigStatus" class="hint"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" data-tab-panel="settings-danger">
+                <div class="form-grid">
+                  <div class="danger-box">
+                    <h3>Delete server</h3>
+                    <p>Remove the container and optionally its data. This cannot be undone.</p>
+                    <label class="toggle">
+                      <input id="deleteKeepData" type="checkbox" checked />
+                      <span>Keep world data</span>
+                    </label>
+                    <label class="toggle">
+                      <input id="deleteConfirm" type="checkbox" />
+                      <span>I understand the consequences</span>
+                    </label>
+                    <button id="deleteServerBtn" class="btn danger" type="button">Delete server</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-footer">
+                <label class="toggle">
+                  <input id="settingsRestart" type="checkbox" checked />
+                  <span>Restart after saving</span>
+                </label>
+                <button type="submit" class="btn primary">Save settings</button>
+              </div>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Notes</h2>
+            </div>
+            <ul class="tips">
+              <li>Some settings need a restart to apply.</li>
+            </ul>
+          </div>
+        </div>
+      </section>

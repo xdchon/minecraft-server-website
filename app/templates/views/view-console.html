@@ -1,0 +1,24 @@
+      <section id="view-console" class="view">
+        <div class="panel-grid">
+          <div class="panel wide">
+            <div class="panel-header">
+              <h2>Live Console</h2>
+            </div>
+            <div class="console">
+              <div class="console-top">
+                <div id="consoleServerLabel" class="console-label">No server selected</div>
+                <div class="console-actions">
+                  <button id="liveLogsBtn" class="btn">Start live</button>
+                  <button id="fetchLogsBtn" class="btn ghost">Fetch logs</button>
+                  <button id="clearLogsBtn" class="btn ghost">Clear</button>
+                </div>
+              </div>
+              <pre id="logOutput">Select a server to view logs.</pre>
+              <div class="console-command">
+                <input id="commandInput" type="text" placeholder="Type a console command" />
+                <button id="sendCommandBtn" class="btn primary">Send</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>

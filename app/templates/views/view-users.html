@@ -1,0 +1,38 @@
+      <section id="view-users" class="view">
+        <div class="panel-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Create User</h2>
+              <span class="chip">Owner only</span>
+            </div>
+            <form id="userCreateForm" class="form">
+              <div class="form-grid">
+                <div class="field">
+                  <label>Username</label>
+                  <input id="newUserName" type="text" placeholder="friendname" required />
+                </div>
+                <div class="field">
+                  <label>Temporary password</label>
+                  <input id="newUserPassword" type="password" placeholder="Set a temporary password" required />
+                </div>
+                <div class="field">
+                  <label>Role</label>
+                  <select id="newUserRole">
+                    <option value="admin" selected>Admin</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-footer">
+                <button type="submit" class="btn primary">Create user</button>
+              </div>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <h2>Users</h2>
+            </div>
+            <div id="userList" class="list"></div>
+            <div class="hint">Owner can create and manage accounts.</div>
+          </div>
+        </div>
+      </section>
