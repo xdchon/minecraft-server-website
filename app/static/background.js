@@ -50,12 +50,12 @@ async function fetchBackgrounds() {
     return urls;
   } catch (err) {
     return [
-      "/imgs/background/panorama_0.png",
-      "/imgs/background/panorama_1.png",
-      "/imgs/background/panorama_2.png",
-      "/imgs/background/panorama_3.png",
-      "/imgs/background/panorama_4.png",
-      "/imgs/background/panorama_5.png",
+      "/static/imgs/background/panorama_0.png",
+      "/static/imgs/background/panorama_1.png",
+      "/static/imgs/background/panorama_2.png",
+      "/static/imgs/background/panorama_3.png",
+      "/static/imgs/background/panorama_4.png",
+      "/static/imgs/background/panorama_5.png",
     ];
   }
 }

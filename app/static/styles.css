@@ -160,7 +160,7 @@ Classes:
     justify-content: center;
     text-align: center;
     background-size: cover;
-    background-image: url('../imgs/ui/sign.png');
+    background-image: url('imgs/ui/sign.png');
     white-space: pre-line;
     color: #000;
 }
@@ -170,7 +170,7 @@ Classes:
     --zoom: 4;
     box-sizing: content-box;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/map.png');
+    border-image: url('imgs/ui/map.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 12.75% 15.75% fill;
     border-image-repeat: repeat;
@@ -182,7 +182,7 @@ Classes:
     border-width: var(--size);
     border-style: solid;
     border-left-width: calc(var(--size) / 1.5);
-    border-image: url('../imgs/ui/book.png');
+    border-image: url('imgs/ui/book.png');
     border-image-width: var(--size) var(--size) var(--size) calc(var(--size) / 1.5);
     border-image-slice: 8.5% 15% 12.75% 10% fill;
     border-image-repeat: stretch;
@@ -196,27 +196,27 @@ Classes:
     cursor: pointer;
     image-rendering: pixelated;
     background-size: cover;
-    background-image: url('../imgs/ui/button-inside.png');
+    background-image: url('imgs/ui/button-inside.png');
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/button-border.png');
+    border-image: url('imgs/ui/button-border.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 10% 3%;
     border-image-repeat: stretch;
     color: #d1d5db;
 } .button:hover {
     background-size: cover;
-    background-image: url('../imgs/ui/button-inside-hover.png');
+    background-image: url('imgs/ui/button-inside-hover.png');
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/button-border-hover.png');
+    border-image: url('imgs/ui/button-border-hover.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 10% 3%;
     border-image-repeat: stretch;
     color: #fef08a;
 } .button:active {
     background-size: cover;
-    background-image: url('../imgs/ui/button-inside-active.png');
+    background-image: url('imgs/ui/button-inside-active.png');
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/button-border-active.png');
+    border-image: url('imgs/ui/button-border-active.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 10% 3%;
     border-image-repeat: contain;
@@ -231,14 +231,14 @@ Classes:
 } .scrollbar::-webkit-scrollbar-thumb {
     --zoom: 24;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/scroll-thumb.png');
+    border-image: url('imgs/ui/scroll-thumb.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 33.5% 33.5% fill;
     border-image-repeat: stretch;
 } .scrollbar::-webkit-scrollbar-thumb:active {
     --zoom: 24;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/scroll-thumb-active.png');
+    border-image: url('imgs/ui/scroll-thumb-active.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 33.5% 33.5% fill;
     border-image-repeat: stretch;
@@ -247,7 +247,7 @@ Classes:
 .transparent-panel {
     --zoom: 10;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/transparent-panel.png');
+    border-image: url('imgs/ui/transparent-panel.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 43% 43% fill;
     border-image-repeat: stretch;
@@ -258,7 +258,7 @@ Classes:
 .markdown table {
     --zoom: 10;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/panel.png');
+    border-image: url('imgs/ui/panel.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 43% 43% fill;
     border-image-repeat: stretch;
@@ -267,7 +267,7 @@ Classes:
 .panel-dark {
     --zoom: 10;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/panel-dark.png');
+    border-image: url('imgs/ui/panel-dark.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 43% 43% fill;
     border-image-repeat: stretch;
@@ -276,7 +276,7 @@ Classes:
 .transparent-achievement-panel {
     --zoom: 10;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/transparent-achievement-panel.png');
+    border-image: url('imgs/ui/transparent-achievement-panel.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 45.5% 45.5% fill;
     border-image-repeat: stretch;
@@ -289,7 +289,7 @@ Classes:
 .markdown blockquote {
     --zoom: 10;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/achievement-panel.png');
+    border-image: url('imgs/ui/achievement-panel.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 45.5% 45.5% fill;
     border-image-repeat: stretch;
@@ -298,7 +298,7 @@ Classes:
 .transparent-slot {
     --zoom: 24;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/transparent-slot.png');
+    border-image: url('imgs/ui/transparent-slot.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 33.5% 33.5% fill;
     border-image-repeat: stretch;
@@ -310,7 +310,7 @@ Classes:
 .scrollbar::-webkit-scrollbar-track {
     --zoom: 24;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/slot.png');
+    border-image: url('imgs/ui/slot.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 33.5% 33.5% fill;
     border-image-repeat: stretch;
@@ -319,7 +319,7 @@ Classes:
 .transparent-raised-slot {
     --zoom: 24;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/transparent-raised-slot.png');
+    border-image: url('imgs/ui/transparent-raised-slot.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 33.5% 33.5% fill;
     border-image-repeat: stretch;
@@ -330,7 +330,7 @@ Classes:
 .scrollbar::-webkit-scrollbar-corner {
     --zoom: 24;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/raised-slot.png');
+    border-image: url('imgs/ui/raised-slot.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 33.5% 33.5% fill;
     border-image-repeat: stretch;
@@ -338,7 +338,7 @@ Classes:
   .raised-slot-button:hover {
     --zoom: 24;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/raised-slot-hover.png');
+    border-image: url('imgs/ui/raised-slot-hover.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 33.5% 33.5% fill;
     border-image-repeat: stretch;
@@ -346,7 +346,7 @@ Classes:
   .raised-slot-button:active {
     --zoom: 24;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/raised-slot-active.png');
+    border-image: url('imgs/ui/raised-slot-active.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 33.5% 33.5% fill;
     border-image-repeat: stretch;
@@ -356,7 +356,7 @@ Classes:
 .enchanting-slot-button {
     --zoom: 24;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/enchanting-slot.png');
+    border-image: url('imgs/ui/enchanting-slot.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 33.5% 33.5% fill;
     border-image-repeat: stretch;
@@ -364,7 +364,7 @@ Classes:
   .enchanting-slot-button:hover {
     --zoom: 24;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/enchanting-slot-hover.png');
+    border-image: url('imgs/ui/enchanting-slot-hover.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 33.5% 33.5% fill;
     border-image-repeat: stretch;
@@ -372,7 +372,7 @@ Classes:
   .enchanting-slot-button:active {
     --zoom: 24;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/enchanting-slot-active.png');
+    border-image: url('imgs/ui/enchanting-slot-active.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 33.5% 33.5% fill;
     border-image-repeat: stretch;
@@ -381,7 +381,7 @@ Classes:
 .anvil-textbox {
     --zoom: 16;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/anvil-textbox.png');
+    border-image: url('imgs/ui/anvil-textbox.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 40% 40% fill;
     border-image-repeat: stretch;
@@ -390,7 +390,7 @@ Classes:
   .anvil-textbox:focus {
     --zoom: 16;
     border-width: calc(var(--block-size) / var(--zoom));
-    border-image: url('../imgs/ui/anvil-textbox-active.png');
+    border-image: url('imgs/ui/anvil-textbox-active.png');
     border-image-width: calc(var(--block-size) / var(--zoom));
     border-image-slice: 40% 40% fill;
     border-image-repeat: stretch;
@@ -491,49 +491,49 @@ Classes:
 /* Fonts */
 @font-face {
     font-family: 'Minecraft';
-    src: url('/fonts/Minecraft-Bold.woff2') format('woff2');
+    src: url('fonts/Minecraft-Bold.woff2') format('woff2');
     font-weight: bold;
     font-style: normal;
     font-display: swap;
 } @font-face {
     font-family: 'Minecraft';
-    src: url('/fonts/Minecraft-BoldItalic.woff2') format('woff2');
+    src: url('fonts/Minecraft-BoldItalic.woff2') format('woff2');
     font-weight: bold;
     font-style: italic;
     font-display: swap;
 } @font-face {
     font-family: 'Minecraft';
-    src: url('/fonts/Minecraft-Italic.woff2') format('woff2');
+    src: url('fonts/Minecraft-Italic.woff2') format('woff2');
     font-weight: normal;
     font-style: italic;
     font-display: swap;
 } @font-face {
     font-family: 'Minecraft';
-    src: url('/fonts/Minecraft-Regular.woff2') format('woff2');
+    src: url('fonts/Minecraft-Regular.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
 } @font-face {
     font-family: 'Monocraft';
-    src: url('/fonts/Monocraft.woff2') format('woff2');
+    src: url('fonts/Monocraft.woff2') format('woff2');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
 } @font-face {
     font-family: 'Minecrafter';
-    src: url('/fonts/Minecrafter.woff2') format('woff2');
+    src: url('fonts/Minecrafter.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
 } @font-face {
     font-family: 'Minecrafter Alt';
-    src: url('/fonts/MinecrafterAlt.woff2') format('woff2');
+    src: url('fonts/MinecrafterAlt.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
 } @font-face {
     font-family: 'Minecraft Evenings';
-    src: url('/fonts/MinecraftEvenings.woff2') format('woff2');
+    src: url('fonts/MinecraftEvenings.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -606,7 +606,7 @@ body.console-mode .view {
   position: fixed;
   inset: 0;
   background-image: linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.88)),
-    url("/imgs/blocks/dirt.png");
+    url("imgs/blocks/dirt.png");
   background-repeat: repeat;
   background-size: cover, var(--block-size);
   image-rendering: pixelated;
@@ -686,7 +686,7 @@ body.console-mode .view {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("/imgs/ui/slot.png");
+  border-image: url("imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -731,7 +731,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/transparent-panel.png");
+  border-image: url("imgs/ui/transparent-panel.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 43% 43% fill;
   border-image-repeat: stretch;
@@ -892,7 +892,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/raised-slot.png");
+  border-image: url("imgs/ui/raised-slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -906,12 +906,12 @@ body.console-mode .view {
   border-style: solid;
   border-color: transparent;
   border-width: calc(var(--block-size) / var(--zoom));
-  border-image-source: url("/imgs/ui/button-border.png");
+  border-image-source: url("imgs/ui/button-border.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 10% 3%;
   border-image-repeat: stretch;
   background-size: cover;
-  background-image: url("/imgs/ui/button-inside.png");
+  background-image: url("imgs/ui/button-inside.png");
   background-color: transparent;
   image-rendering: pixelated;
   color: #d1d5db;
@@ -930,31 +930,31 @@ body.console-mode .view {
 .btn:hover,
 .nav-item:hover,
 .tab:hover {
-  background-image: url("/imgs/ui/button-inside-hover.png");
-  border-image-source: url("/imgs/ui/button-border-hover-white.png");
+  background-image: url("imgs/ui/button-inside-hover.png");
+  border-image-source: url("imgs/ui/button-border-hover-white.png");
   color: var(--mc-gold);
 }
 
 .btn:active,
 .nav-item:active,
 .tab:active {
-  background-image: url("/imgs/ui/button-inside-active.png");
-  border-image-source: url("/imgs/ui/button-border-active.png");
+  background-image: url("imgs/ui/button-inside-active.png");
+  border-image-source: url("imgs/ui/button-border-active.png");
   color: #a8a29e;
 }
 
 .btn:focus-visible,
 .nav-item:focus-visible,
 .tab:focus-visible {
-  background-image: url("/imgs/ui/button-inside-hover.png");
-  border-image-source: url("/imgs/ui/button-border-hover-white.png");
+  background-image: url("imgs/ui/button-inside-hover.png");
+  border-image-source: url("imgs/ui/button-border-hover-white.png");
   color: var(--mc-gold);
 }
 
 .nav-item.active,
 .tab.active {
-  background-image: url("/imgs/ui/button-inside-active.png");
-  border-image-source: url("/imgs/ui/button-border-active.png");
+  background-image: url("imgs/ui/button-inside-active.png");
+  border-image-source: url("imgs/ui/button-border-active.png");
   color: var(--mc-gold);
 }
 
@@ -1021,7 +1021,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image-source: url("/imgs/ui/raised-slot.png");
+  border-image-source: url("imgs/ui/raised-slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -1029,11 +1029,11 @@ body.console-mode .view {
 }
 
 .server-card:hover {
-  border-image-source: url("/imgs/ui/raised-slot-hover.png");
+  border-image-source: url("imgs/ui/raised-slot-hover.png");
 }
 
 .server-card.active {
-  border-image-source: url("/imgs/ui/raised-slot-active.png");
+  border-image-source: url("imgs/ui/raised-slot-active.png");
 }
 
 .server-card.skeleton {
@@ -1106,7 +1106,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/slot.png");
+  border-image: url("imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -1168,7 +1168,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/slot.png");
+  border-image: url("imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -1245,7 +1245,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image-source: url("/imgs/ui/anvil-textbox.png");
+  border-image-source: url("imgs/ui/anvil-textbox.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 40% 40% fill;
   border-image-repeat: stretch;
@@ -1264,7 +1264,7 @@ body.console-mode .view {
   -webkit-appearance: none;
   -moz-appearance: none;
   padding-right: 42px;
-  background-image: url("/imgs/icons/arrow-down.png");
+  background-image: url("imgs/icons/arrow-down.png");
   background-repeat: no-repeat;
   background-position: right 12px center;
   background-size: 16px 16px;
@@ -1275,13 +1275,13 @@ body.console-mode .view {
 .field select:hover,
 .mod-config-actions select:hover,
 .console-top select:hover {
-  background-image: url("/imgs/icons/arrow-down-hover.png");
+  background-image: url("imgs/icons/arrow-down-hover.png");
 }
 
 .field select:focus,
 .mod-config-actions select:focus,
 .console-top select:focus {
-  background-image: url("/imgs/icons/arrow-down-hover.png");
+  background-image: url("imgs/icons/arrow-down-hover.png");
 }
 
 .field select option,
@@ -1298,7 +1298,7 @@ body.console-mode .view {
 .console-top select:focus,
 .console-command input:focus,
 .login-card input:focus {
-  border-image-source: url("/imgs/ui/anvil-textbox-active.png");
+  border-image-source: url("imgs/ui/anvil-textbox-active.png");
 }
 
 .console-label {
@@ -1316,7 +1316,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/raised-slot.png");
+  border-image: url("imgs/ui/raised-slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -1374,14 +1374,14 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image-source: url("/imgs/ui/slot.png");
+  border-image-source: url("imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
 }
 
 .list-item.active {
-  border-image-source: url("/imgs/ui/raised-slot-active.png");
+  border-image-source: url("imgs/ui/raised-slot-active.png");
 }
 
 .list-item.disabled {
@@ -1405,7 +1405,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/achievement-panel.png");
+  border-image: url("imgs/ui/achievement-panel.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 45.5% 45.5% fill;
   border-image-repeat: stretch;
@@ -1432,7 +1432,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/panel.png");
+  border-image: url("imgs/ui/panel.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 43% 43% fill;
   border-image-repeat: stretch;
@@ -1447,7 +1447,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/slot.png");
+  border-image: url("imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -1484,7 +1484,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/panel-dark.png");
+  border-image: url("imgs/ui/panel-dark.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 43% 43% fill;
   border-image-repeat: stretch;
@@ -1535,7 +1535,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/panel-dark.png");
+  border-image: url("imgs/ui/panel-dark.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 43% 43% fill;
   border-image-repeat: stretch;
@@ -1583,7 +1583,7 @@ body.console-mode .view {
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
   border-color: transparent;
-  border-image: url("/imgs/ui/achievement-panel.png");
+  border-image: url("imgs/ui/achievement-panel.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 45.5% 45.5% fill;
   border-image-repeat: stretch;
@@ -1638,7 +1638,7 @@ body.console-mode .view {
 .login-card .field input {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
-  border-image-source: url("/imgs/ui/enchanting-slot.png");
+  border-image-source: url("imgs/ui/enchanting-slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -1651,7 +1651,7 @@ body.console-mode .view {
 }
 
 .login-card .field input:focus {
-  border-image-source: url("/imgs/ui/enchanting-slot-active.png");
+  border-image-source: url("imgs/ui/enchanting-slot-active.png");
   background-color: rgba(0, 0, 0, 0.25);
 }
 
@@ -1681,7 +1681,7 @@ body.console-mode .view {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("/imgs/ui/scroll-thumb.png");
+  border-image: url("imgs/ui/scroll-thumb.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -1693,7 +1693,7 @@ body.console-mode .view {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("/imgs/ui/scroll-thumb-active.png");
+  border-image: url("imgs/ui/scroll-thumb-active.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -1705,7 +1705,7 @@ body.console-mode .view {
   --zoom: 24;
   border-width: calc(var(--block-size) / var(--zoom));
   border-style: solid;
-  border-image: url("/imgs/ui/slot.png");
+  border-image: url("imgs/ui/slot.png");
   border-image-width: calc(var(--block-size) / var(--zoom));
   border-image-slice: 33.5% 33.5% fill;
   border-image-repeat: stretch;
@@ -1769,7 +1769,7 @@ body.console-mode .view {
   position: relative;
   width: 100%;
   height: var(--mc-slider-height);
-  background-image: url("/imgs/ui/button-inside-active.png");
+  background-image: url("imgs/ui/button-inside-active.png");
   background-size: 100% 100%;
   background-repeat: repeat;
   border: var(--mc-slider-border) solid #000;
@@ -1793,7 +1793,7 @@ body.console-mode .view {
   left: calc(var(--mc-slider-percent) * (100% - var(--mc-slider-thumb)));
   width: var(--mc-slider-thumb);
   height: 100%;
-  background-image: url("/imgs/ui/slider.jpg");
+  background-image: url("imgs/ui/slider.jpg");
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;

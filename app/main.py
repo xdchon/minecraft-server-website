@@ -129,7 +129,7 @@ def theme_backgrounds() -> JSONResponse:
                 continue
             if path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
                 continue
-            urls.append(f"/imgs/background/{path.name}")
+            urls.append(f"/static/imgs/background/{path.name}")
     return JSONResponse(content={"urls": urls})
 
 
