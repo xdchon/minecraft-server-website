@@ -15,7 +15,7 @@ from .cloudflare_dns import CloudflareDNS
 from docker.errors import DockerException
 
 from ..config import settings
-from ..docker_client import docker_client
+from ..docker_client import get_docker_client
 from ..models import (
     CommandRequest,
     CommandResponse,
@@ -133,12 +133,18 @@ class MinecraftService:
         self.dns = None
         self._dns_thread_started = False
         if settings.auto_dns_enabled:
-            # Fail fast if misconfigured, so you notice immediately in logs
-            self.dns = CloudflareDNS(
-                api_token=settings.cf_api_token,
-                zone_id=settings.cf_zone_id,
-                zone_name=settings.cf_zone_name,
-            )
+            try:
+                self.dns = CloudflareDNS(
+                    api_token=settings.cf_api_token,
+                    zone_id=settings.cf_zone_id,
+                    zone_name=settings.cf_zone_name,
+                )
+            except Exception as exc:
+                self.log.warning(
+                    "AUTO_DNS_ENABLED is true but Cloudflare DNS is misconfigured (%s); continuing without DNS automation.",
+                    exc,
+                )
+                self.dns = None
     def _sanitize_name(self, name: str) -> str:
         cleaned = re.sub(r"[^a-zA-Z0-9-]+", "-", name).strip("-").lower()
         return cleaned or "server"
@@ -166,6 +172,7 @@ class MinecraftService:
         if not self.dns:
             return
         try:
+            docker_client = get_docker_client()
             containers = docker_client.containers.list(
                 all=True,
                 filters={"label": f"{settings.managed_label}={settings.managed_label_value}"},
@@ -212,6 +219,7 @@ class MinecraftService:
 
     def list_servers(self) -> list[ServerInfo]:
         try:
+            docker_client = get_docker_client()
             containers = docker_client.containers.list(
                 all=True,
                 filters={"label": f"{settings.managed_label}={settings.managed_label_value}"},
@@ -261,6 +269,7 @@ class MinecraftService:
             dns_name = safe_name
             labels["mc.dns_name"] = dns_name
             env = self._build_env(request, memory_mb, enable_rcon, rcon_password, port)
+            docker_client = get_docker_client()
             container = docker_client.containers.run(
                 settings.minecraft_image,
                 name=f"mc_{safe_name}_{server_id[:6]}",
@@ -762,6 +771,7 @@ class MinecraftService:
     def _get_used_ports(self) -> set[int]:
         used: set[int] = set()
         try:
+            docker_client = get_docker_client()
             containers = docker_client.containers.list(all=True)
         except DockerException as exc:
             raise ServiceError(503, f"Docker unavailable: {exc}") from exc
@@ -846,6 +856,7 @@ class MinecraftService:
             return 0
 
         try:
+            docker_client = get_docker_client()
             containers = docker_client.containers.list(
                 all=True,
                 filters={"label": f"{settings.managed_label}={settings.managed_label_value}"},
@@ -916,6 +927,7 @@ class MinecraftService:
 
     def _get_container_by_server_id(self, server_id: str):
         try:
+            docker_client = get_docker_client()
             containers = docker_client.containers.list(
                 all=True,
                 filters={
@@ -1232,6 +1244,7 @@ class MinecraftService:
             if container.status == "running":
                 container.stop()
             container.remove()
+            docker_client = get_docker_client()
             docker_client.containers.run(
                 image_tag,
                 name=container_name,
@@ -1296,6 +1309,7 @@ class MinecraftService:
             if container.status == "running":
                 container.stop()
             container.remove()
+            docker_client = get_docker_client()
             new_container = docker_client.containers.create(
                 image_tag,
                 name=container_name,

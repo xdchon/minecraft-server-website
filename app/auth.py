@@ -40,7 +40,9 @@ class AuthService:
             )
 
     def init_db(self) -> None:
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        auth_dir = os.path.dirname(self.db_path)
+        if auth_dir:
+            os.makedirs(auth_dir, exist_ok=True)
         with self._connect() as conn:
             conn.execute(
                 """
@@ -76,14 +78,40 @@ class AuthService:
             if existing and existing[0] > 0:
                 return
 
-        username = (settings.owner_username or "").strip().lower()
+        username = (settings.owner_username or "").strip().lower() or "owner"
         password = settings.owner_password or ""
-        if not username or not password:
-            raise RuntimeError(
-                "No users exist. Set OWNER_USERNAME and OWNER_PASSWORD to bootstrap the owner account."
-            )
+
+        if not password:
+            password = secrets.token_urlsafe(18)
+            bootstrap_path = os.path.join(os.path.dirname(self.db_path), "bootstrap.txt")
+            try:
+                auth_dir = os.path.dirname(self.db_path)
+                if auth_dir:
+                    os.makedirs(auth_dir, exist_ok=True)
+                if not os.path.exists(bootstrap_path):
+                    with open(bootstrap_path, "w", encoding="utf-8") as handle:
+                        handle.write("MCServer Control Panel bootstrap credentials\n")
+                        handle.write(f"username={username}\n")
+                        handle.write(f"password={password}\n")
+                    try:
+                        os.chmod(bootstrap_path, 0o600)
+                    except OSError:
+                        pass
+                logger.warning(
+                    "No users exist and OWNER_PASSWORD is not set; generated bootstrap credentials at %s",
+                    bootstrap_path,
+                )
+            except OSError:
+                logger.warning(
+                    "No users exist and OWNER_PASSWORD is not set; generated bootstrap password for user '%s'",
+                    username,
+                )
+
         self.create_user(username=username, password=password, role="owner")
-        logger.info("Owner account created from environment variables.")
+        if settings.owner_username and settings.owner_password:
+            logger.info("Owner account created from environment variables.")
+        else:
+            logger.info("Owner account created from generated bootstrap credentials.")
 
     def authenticate(self, username: str, password: str) -> Optional[AuthUser]:
         username = username.strip().lower()
@@ -180,6 +208,9 @@ class AuthService:
         return self.get_user_by_session(token)
 
     def _connect(self) -> sqlite3.Connection:
+        auth_dir = os.path.dirname(self.db_path)
+        if auth_dir:
+            os.makedirs(auth_dir, exist_ok=True)
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")

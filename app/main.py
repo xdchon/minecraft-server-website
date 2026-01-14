@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Optional
 
@@ -52,6 +53,7 @@ from .services.branding_service import (
 )
 
 app = FastAPI(title="Minecraft Docker Manager")
+logger = logging.getLogger(__name__)
 modrinth = ModrinthService()
 service = MinecraftService(modrinth=modrinth)
 metadata = MetadataService()
@@ -69,10 +71,25 @@ templates = Jinja2Templates(directory=templates_dir)
 
 @app.on_event("startup")
 def startup() -> None:
-    auth_service.init_db()
-    auth_service.ensure_owner_bootstrap()
-    ensure_branding_assets()
-    service.start_dns_reconciler()
+    try:
+        auth_service.init_db()
+    except Exception:
+        logger.exception("Auth database init failed")
+
+    try:
+        auth_service.ensure_owner_bootstrap()
+    except Exception:
+        logger.exception("Owner bootstrap failed")
+
+    try:
+        ensure_branding_assets()
+    except Exception:
+        logger.exception("Branding asset init failed")
+
+    try:
+        service.start_dns_reconciler()
+    except Exception:
+        logger.exception("DNS reconciler startup failed")
 
 
 @app.middleware("http")
