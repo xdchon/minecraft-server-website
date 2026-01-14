@@ -29,7 +29,7 @@ class BrandingPaths:
 
 def _static_default_logo_path() -> str:
     app_dir = Path(__file__).resolve().parents[1]
-    preferred = app_dir / "static" / "minecraft-theme" / "imgs" / "ui" / "Comedianos.png"
+    preferred = app_dir / "static" / "imgs" / "ui" / "Comedianos.png"
     if preferred.exists():
         return str(preferred)
     return str(app_dir / "static" / "comedianos.png")

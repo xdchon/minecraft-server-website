@@ -60,10 +60,10 @@ base_dir = os.path.dirname(os.path.abspath(__file__))
 static_dir = os.path.join(base_dir, "static")
 templates_dir = os.path.join(base_dir, "templates")
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
-theme_dir = os.path.join(static_dir, "minecraft-theme")
-app.mount("/css", StaticFiles(directory=os.path.join(theme_dir, "css")), name="theme-css")
-app.mount("/fonts", StaticFiles(directory=os.path.join(theme_dir, "fonts")), name="theme-fonts")
-app.mount("/imgs", StaticFiles(directory=os.path.join(theme_dir, "imgs")), name="theme-imgs")
+static_fonts_dir = os.path.join(static_dir, "fonts")
+static_imgs_dir = os.path.join(static_dir, "imgs")
+app.mount("/fonts", StaticFiles(directory=static_fonts_dir), name="fonts")
+app.mount("/imgs", StaticFiles(directory=static_imgs_dir), name="imgs")
 templates = Jinja2Templates(directory=templates_dir)
 
 
@@ -78,7 +78,7 @@ def startup() -> None:
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
-    if path.startswith(("/static", "/css", "/fonts", "/imgs")) or path in {
+    if path.startswith(("/static", "/fonts", "/imgs")) or path in {
         "/login",
         "/auth/login",
         "/auth/logout",
@@ -119,7 +119,7 @@ def login_page() -> FileResponse:
 
 @app.get("/theme/backgrounds")
 def theme_backgrounds() -> JSONResponse:
-    background_dir = Path(theme_dir) / "imgs" / "background"
+    background_dir = Path(static_imgs_dir) / "background"
     urls: list[str] = []
     if background_dir.exists():
         for path in sorted(background_dir.iterdir()):
