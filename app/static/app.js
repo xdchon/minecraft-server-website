@@ -11,6 +11,7 @@ const logoutBtn = document.getElementById("logoutBtn");
 const serverListEl = document.getElementById("serverList");
 const emptyStateEl = document.getElementById("emptyState");
 const refreshBtn = document.getElementById("refreshBtn");
+const clearServerBtn = document.getElementById("clearServerBtn");
 const newServerBtn = document.getElementById("newServerBtn");
 const activeServerName = document.getElementById("activeServerName");
 const activeServerMeta = document.getElementById("activeServerMeta");
@@ -62,6 +63,10 @@ const modpackSearchInput = document.getElementById("modpackSearchInput");
 const modpackOverwrite = document.getElementById("modpackOverwrite");
 const modpackSearchBtn = document.getElementById("modpackSearchBtn");
 const modpackSearchResults = document.getElementById("modpackSearchResults");
+const modUploadOverwrite = document.getElementById("modUploadOverwrite");
+const modUploadInput = document.getElementById("modUploadInput");
+const modUploadZone = document.getElementById("modUploadZone");
+const modUploadStatus = document.getElementById("modUploadStatus");
 const installedMods = document.getElementById("installedMods");
 
 const consoleServerLabel = document.getElementById("consoleServerLabel");
@@ -93,6 +98,7 @@ let modVersionCache = {};
 let modSearchToken = 0;
 let modpackVersionCache = {};
 let modpackSearchToken = 0;
+let modUploadBusy = false;
 let lastModServerId = null;
 let modGameVersionOverrides = {};
 let liveLogsController = null;
@@ -779,8 +785,10 @@ function setActiveServer(serverId) {
     updateActionButtons(null);
     syncModFiltersWithServer();
     resetModConfigState();
+    stopLiveLogs();
     updateConsoleLabel();
     updateNavAvailability();
+    renderServers();
     return;
   }
   if (previousServerId && previousServerId !== serverId) {
@@ -846,6 +854,9 @@ function updateConsoleLabel() {
 }
 
 function updateActionButtons(server) {
+  if (clearServerBtn) {
+    clearServerBtn.disabled = !server;
+  }
   if (!server) {
     startBtn.disabled = true;
     stopBtn.disabled = true;
@@ -864,6 +875,21 @@ function updateActionButtons(server) {
   restartBtn.disabled = false;
 }
 
+function setModUploadStatus(message) {
+  if (!modUploadStatus) return;
+  modUploadStatus.textContent = message || "";
+}
+
+function setModUploadEnabled(enabled) {
+  const canUse = !!enabled && !modUploadBusy;
+  if (modUploadInput) modUploadInput.disabled = !canUse;
+  if (modUploadOverwrite) modUploadOverwrite.disabled = !canUse;
+  if (modUploadZone) {
+    modUploadZone.classList.toggle("disabled", !canUse);
+    if (!canUse) modUploadZone.classList.remove("dragover");
+  }
+}
+
 function syncModFiltersWithServer() {
   if (activeServerId !== lastModServerId) {
     modSearchToken += 1;
@@ -874,6 +900,8 @@ function syncModFiltersWithServer() {
     modpackVersionCache = {};
     if (modpackSearchResults) modpackSearchResults.innerHTML = "";
     if (modpackSearchInput) modpackSearchInput.value = "";
+    if (modUploadInput) modUploadInput.value = "";
+    setModUploadStatus("");
     lastModServerId = activeServerId;
   }
 
@@ -892,6 +920,8 @@ function syncModFiltersWithServer() {
     if (modpackSearchResults) {
       modpackSearchResults.innerHTML = `<div class="list-item">Select a server to search modpacks.</div>`;
     }
+    setModUploadEnabled(false);
+    setModUploadStatus("Select a server to upload mods.");
     return;
   }
 
@@ -915,6 +945,8 @@ function syncModFiltersWithServer() {
     if (modpackSearchResults) {
       modpackSearchResults.innerHTML = `<div class="list-item">Modpacks require a Fabric or Forge server.</div>`;
     }
+    setModUploadEnabled(false);
+    setModUploadStatus("Mods require a Fabric or Forge server.");
     return;
   }
 
@@ -931,6 +963,8 @@ function syncModFiltersWithServer() {
   if (modpackSearchInput) modpackSearchInput.disabled = false;
   if (modpackOverwrite) modpackOverwrite.disabled = false;
   if (modpackSearchBtn) modpackSearchBtn.disabled = false;
+  setModUploadEnabled(true);
+  setModUploadStatus("");
 
   if (!normalizedVersion && !modGameVersion.value.trim() && !modSearchResults.firstElementChild) {
     modSearchResults.innerHTML = `<div class="list-item">Tip: enter a Game version to filter compatible mods and enable installs.</div>`;
@@ -1922,6 +1956,76 @@ async function installModpack(projectId, versionId) {
   }
 }
 
+async function uploadModFiles(fileList) {
+  if (!fileList || !fileList.length) return;
+  if (!activeServerId) {
+    toast("Select a server first", "error");
+    return;
+  }
+
+  const context = getModContext();
+  if (context.error) {
+    toast(context.error, "error");
+    return;
+  }
+  if (!context.isModded) {
+    toast("Mods require a Fabric or Forge server", "error");
+    return;
+  }
+
+  const files = Array.from(fileList).filter((file) => file && file.name);
+  const jarFiles = files.filter((file) => file.name.toLowerCase().endsWith(".jar"));
+  if (!jarFiles.length) {
+    toast("Only .jar files can be uploaded to the mods folder.", "error");
+    return;
+  }
+
+  const overwrite = modUploadOverwrite && modUploadOverwrite.value === "true";
+  if (overwrite) {
+    const ok = window.confirm("Overwrite existing mod jar files with the same name?");
+    if (!ok) return;
+  }
+
+  const restart = modRestart.value === "true";
+  const params = new URLSearchParams({
+    restart: restart ? "true" : "false",
+    overwrite: overwrite ? "true" : "false",
+  });
+
+  const formData = new FormData();
+  jarFiles.forEach((file) => formData.append("files", file, file.name));
+
+  modUploadBusy = true;
+  setModUploadEnabled(true);
+  setModUploadStatus(`Uploading ${jarFiles.length} mod(s)…`);
+
+  try {
+    const response = await apiUpload(`/servers/${activeServerId}/mods/upload?${params.toString()}`, formData);
+    const uploaded = Array.isArray(response.uploaded) ? response.uploaded.length : 0;
+    const overwrittenCount = Array.isArray(response.overwritten) ? response.overwritten.length : 0;
+    const skipped = Array.isArray(response.skipped) ? response.skipped.length : 0;
+
+    const summary = [];
+    if (uploaded) summary.push(`${uploaded} uploaded`);
+    if (overwrittenCount) summary.push(`${overwrittenCount} overwritten`);
+    if (skipped) summary.push(`${skipped} skipped`);
+    const message = summary.length ? `Mods: ${summary.join(", ")}.` : "Mods uploaded.";
+    toast(message, "success");
+    setModUploadStatus(message);
+    await loadMods();
+  } catch (err) {
+    const message = err && err.message ? err.message : "Upload failed.";
+    toast(message, "error");
+    setModUploadStatus(message);
+  } finally {
+    modUploadBusy = false;
+    const server = getActiveServer();
+    const serverType = (server?.server_type || "").toLowerCase();
+    const isModded = serverType === "fabric" || serverType === "forge";
+    setModUploadEnabled(!!server && isModded);
+  }
+}
+
 async function removeMod(filename) {
   if (!activeServerId) return;
   const restart = modRestart.value === "true";
@@ -2022,6 +2126,15 @@ function bindEvents() {
   }
 
   refreshBtn.addEventListener("click", loadServers);
+  if (clearServerBtn) {
+    clearServerBtn.addEventListener("click", () => {
+      if (!activeServerId) return;
+      setActiveServer(null);
+      if (viewRequiresServer(activeViewId)) {
+        navigateToView("view-servers", { replace: true });
+      }
+    });
+  }
   newServerBtn.addEventListener("click", () => navigateToView("view-create"));
   startBtn.addEventListener("click", () => sendServerAction("start"));
   stopBtn.addEventListener("click", () => sendServerAction("stop"));
@@ -2033,14 +2146,28 @@ function bindEvents() {
       const action = button.dataset.action;
       const serverId = button.dataset.id;
       if (action === "select") {
-        setActiveServer(serverId);
+        if (serverId === activeServerId) {
+          setActiveServer(null);
+          if (viewRequiresServer(activeViewId)) {
+            navigateToView("view-servers", { replace: true });
+          }
+        } else {
+          setActiveServer(serverId);
+        }
       }
       return;
     }
 
     const card = event.target.closest(".server-card");
     if (card && card.dataset.id) {
-      setActiveServer(card.dataset.id);
+      if (card.dataset.id === activeServerId) {
+        setActiveServer(null);
+        if (viewRequiresServer(activeViewId)) {
+          navigateToView("view-servers", { replace: true });
+        }
+      } else {
+        setActiveServer(card.dataset.id);
+      }
     }
   });
 
@@ -2204,6 +2331,55 @@ function bindEvents() {
       removeMod(name);
     }
   });
+
+  if (modUploadZone && modUploadInput) {
+    const openPicker = () => {
+      if (modUploadInput.disabled) return;
+      modUploadInput.click();
+    };
+
+    modUploadZone.addEventListener("click", openPicker);
+    modUploadZone.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openPicker();
+      }
+    });
+    modUploadInput.addEventListener("change", () => {
+      const files = modUploadInput.files;
+      if (files && files.length) {
+        uploadModFiles(files);
+      }
+      modUploadInput.value = "";
+    });
+
+    modUploadZone.addEventListener("dragenter", (event) => {
+      event.preventDefault();
+      if (!modUploadInput.disabled) {
+        modUploadZone.classList.add("dragover");
+      }
+    });
+    modUploadZone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = modUploadInput.disabled ? "none" : "copy";
+      }
+      modUploadZone.classList.toggle("dragover", !modUploadInput.disabled);
+    });
+    modUploadZone.addEventListener("dragleave", () => {
+      modUploadZone.classList.remove("dragover");
+    });
+    modUploadZone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      modUploadZone.classList.remove("dragover");
+      if (modUploadInput.disabled) {
+        toast("Select a Fabric/Forge server to upload mods.", "error");
+        return;
+      }
+      const files = event.dataTransfer ? event.dataTransfer.files : null;
+      uploadModFiles(files);
+    });
+  }
 
   fetchLogsBtn.addEventListener("click", fetchLogs);
   liveLogsBtn.addEventListener("click", () => {

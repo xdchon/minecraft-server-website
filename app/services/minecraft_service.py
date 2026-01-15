@@ -30,6 +30,7 @@ from ..models import (
     ModInstallRequest,
     ModInstallResponse,
     ModListResponse,
+    ModUploadResponse,
     ModpackInstallRequest,
     ModpackInstallResponse,
     ModConfigFileInfo,
@@ -551,6 +552,98 @@ class MinecraftService:
                 raise ServiceError(500, f"Failed to restart server: {exc}") from exc
 
         return ModInstallResponse(server_id=server_id, filename=main_filename)
+
+    def upload_mods(
+        self,
+        server_id: str,
+        files: Iterable[Any],
+        restart: bool,
+        overwrite: bool,
+    ) -> ModUploadResponse:
+        container = self._get_container_by_server_id(server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
+        self._ensure_modded(container)
+
+        mods_dir = os.path.join(local_dir, "mods")
+        os.makedirs(mods_dir, exist_ok=True)
+
+        import tempfile
+
+        uploaded: list[str] = []
+        overwritten: list[str] = []
+        skipped: list[str] = []
+
+        file_list = list(files or [])
+        if not file_list:
+            raise ServiceError(400, "No files uploaded")
+
+        for upload in file_list:
+            raw_name = getattr(upload, "filename", None) or ""
+            safe_name = os.path.basename(str(raw_name).replace("\\", "/"))
+            if not safe_name:
+                continue
+            if not safe_name.lower().endswith(".jar"):
+                raise ServiceError(400, f"Unsupported mod file type: {safe_name}")
+
+            dest_path = os.path.join(mods_dir, safe_name)
+            existed = os.path.exists(dest_path)
+            if existed and not overwrite:
+                skipped.append(safe_name)
+                continue
+
+            tmp_handle = tempfile.NamedTemporaryFile(
+                dir=mods_dir,
+                prefix=".tmp-upload-",
+                delete=False,
+            )
+            tmp_path = tmp_handle.name
+            tmp_handle.close()
+
+            try:
+                source = getattr(upload, "file", None)
+                if not source:
+                    raise ServiceError(400, f"Invalid upload for: {safe_name}")
+
+                with open(tmp_path, "wb") as handle:
+                    shutil.copyfileobj(source, handle)
+                os.replace(tmp_path, dest_path)
+            except ServiceError:
+                raise
+            except OSError as exc:
+                raise ServiceError(500, f"Failed to save mod file: {exc}") from exc
+            finally:
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except OSError:
+                        pass
+                try:
+                    source = getattr(upload, "file", None)
+                    if source:
+                        source.close()
+                except Exception:
+                    pass
+
+            if existed:
+                overwritten.append(safe_name)
+            else:
+                uploaded.append(safe_name)
+
+        if restart:
+            try:
+                container.restart()
+            except DockerException as exc:
+                raise ServiceError(500, f"Failed to restart server: {exc}") from exc
+
+        return ModUploadResponse(
+            server_id=server_id,
+            uploaded=sorted(uploaded),
+            overwritten=sorted(overwritten),
+            skipped=sorted(skipped),
+        )
 
     def install_modpack(
         self,

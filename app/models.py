@@ -102,6 +102,12 @@ class ModListResponse(BaseModel):
     server_id: str
     mods: list[str]
 
+class ModUploadResponse(BaseModel):
+    server_id: str
+    uploaded: list[str]
+    overwritten: list[str]
+    skipped: list[str]
+
 class ModpackSearchResponse(BaseModel):
     results: list[dict]
 

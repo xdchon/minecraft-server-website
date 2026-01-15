@@ -65,12 +65,34 @@
               <div class="hint">Installs server-compatible files from a Modrinth <code>.mrpack</code> plus overrides.</div>
             </div>
           </div>
-          <div class="panel">
-            <div class="panel-header">
-              <h2>Installed Mods</h2>
-            </div>
-            <div id="installedMods" class="list"></div>
-            <div class="hint">Install and remove mods for the selected server.</div>
-          </div>
-        </div>
-      </section>
+	          <div class="panel">
+	            <div class="panel-header">
+	              <h2>Installed Mods</h2>
+	            </div>
+	            <div id="installedMods" class="list"></div>
+	            <div class="hint">Install/remove mods, or upload your own <code>.jar</code> files.</div>
+
+	            <div class="form-grid">
+	              <div class="field">
+	                <label>Overwrite existing</label>
+	                <select id="modUploadOverwrite">
+	                  <option value="false" selected>No</option>
+	                  <option value="true">Yes</option>
+	                </select>
+	              </div>
+	            </div>
+
+	            <input id="modUploadInput" type="file" accept=".jar" multiple hidden />
+	            <div
+	              id="modUploadZone"
+	              class="drop-zone"
+	              role="button"
+	              tabindex="0"
+	              aria-label="Upload mods by dragging and dropping jar files or clicking to browse"
+	            >
+	              Drop <code>.jar</code> files here or click to browse
+	            </div>
+	            <div id="modUploadStatus" class="hint"></div>
+	          </div>
+	        </div>
+	      </section>

@@ -1399,6 +1399,40 @@ body.console-mode .view {
   text-shadow: var(--mc-shadow);
 }
 
+.drop-zone {
+  padding: 14px;
+  text-align: center;
+  color: var(--mc-muted);
+  text-shadow: var(--mc-shadow);
+  cursor: pointer;
+  user-select: none;
+  --zoom: 24;
+  border-width: calc(var(--block-size) / var(--zoom));
+  border-style: solid;
+  border-color: transparent;
+  border-image-source: url("imgs/ui/slot.png");
+  border-image-width: calc(var(--block-size) / var(--zoom));
+  border-image-slice: 33.5% 33.5% fill;
+  border-image-repeat: stretch;
+  outline: none;
+}
+
+.drop-zone:hover,
+.drop-zone:focus-visible {
+  border-image-source: url("imgs/ui/raised-slot-hover.png");
+  color: var(--mc-gold);
+}
+
+.drop-zone.dragover {
+  border-image-source: url("imgs/ui/raised-slot-active.png");
+  color: var(--mc-gold);
+}
+
+.drop-zone.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .danger-box {
   padding: 16px;
   --zoom: 10;

@@ -40,6 +40,7 @@ from .models import (
     ModConfigUpdateRequest,
     ModSearchResponse,
     ModVersionResponse,
+    ModUploadResponse,
     ModpackInstallRequest,
     ModpackInstallResponse,
     ModpackSearchResponse,
@@ -71,6 +72,17 @@ static_imgs_dir = os.path.join(static_dir, "imgs")
 app.mount("/fonts", StaticFiles(directory=static_fonts_dir), name="fonts")
 app.mount("/imgs", StaticFiles(directory=static_imgs_dir), name="imgs")
 templates = Jinja2Templates(directory=templates_dir)
+
+def _static_version_token() -> str:
+    candidates = ("styles.css", "app.js", "background.js")
+    mtimes: list[int] = []
+    for name in candidates:
+        path = os.path.join(static_dir, name)
+        try:
+            mtimes.append(int(os.path.getmtime(path)))
+        except OSError:
+            continue
+    return str(max(mtimes) if mtimes else 0)
 
 
 @app.on_event("startup")
@@ -122,7 +134,10 @@ async def auth_middleware(request: Request, call_next):
 
 @app.get("/")
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "static_version": _static_version_token()},
+    )
 
 @app.get("/panel")
 def panel_root(request: Request):
@@ -449,6 +464,15 @@ def install_mod(
     restart: bool = Query(False),
 ) -> ModInstallResponse:
     return service.install_mod(server_id, request, restart)
+
+@app.post("/servers/{server_id}/mods/upload", response_model=ModUploadResponse)
+def upload_mods(
+    server_id: str,
+    restart: bool = Query(False),
+    overwrite: bool = Query(False),
+    files: list[UploadFile] = File(...),
+) -> ModUploadResponse:
+    return service.upload_mods(server_id, files, restart=restart, overwrite=overwrite)
 
 @app.post("/servers/{server_id}/modpacks", response_model=ModpackInstallResponse)
 def install_modpack(
