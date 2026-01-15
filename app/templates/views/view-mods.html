@@ -2,14 +2,15 @@
         <div class="panel-grid">
           <div class="panel">
             <div class="panel-header">
-              <h2>Modrinth Search</h2>
-              <span class="chip">Fabric first</span>
+              <h2>Modrinth</h2>
+              <span class="chip">Mods + Modpacks</span>
             </div>
+            <div class="tabs">
+              <button class="tab active" data-tab="modrinth-mods" type="button">Mods</button>
+              <button class="tab" data-tab="modrinth-modpacks" type="button">Modpacks</button>
+            </div>
+
             <div class="form-grid">
-              <div class="field">
-                <label>Search</label>
-                <input id="modSearchInput" type="text" placeholder="Search mods" />
-              </div>
               <div class="field">
                 <label>Loader</label>
                 <select id="modLoader">
@@ -28,11 +29,41 @@
                   <option value="false">No</option>
                 </select>
               </div>
-              <div class="field">
-                <button id="modSearchBtn" class="btn primary" type="button">Search Modrinth</button>
-              </div>
             </div>
-            <div id="modSearchResults" class="list"></div>
+
+            <div class="tab-content active" data-tab-panel="modrinth-mods">
+              <div class="form-grid">
+                <div class="field">
+                  <label>Search</label>
+                  <input id="modSearchInput" type="text" placeholder="Search mods" />
+                </div>
+                <div class="field">
+                  <button id="modSearchBtn" class="btn primary" type="button">Search Mods</button>
+                </div>
+              </div>
+              <div id="modSearchResults" class="list"></div>
+            </div>
+
+            <div class="tab-content" data-tab-panel="modrinth-modpacks">
+              <div class="form-grid">
+                <div class="field">
+                  <label>Search</label>
+                  <input id="modpackSearchInput" type="text" placeholder="Search modpacks" />
+                </div>
+                <div class="field">
+                  <label>Overwrite files</label>
+                  <select id="modpackOverwrite">
+                    <option value="false" selected>No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <button id="modpackSearchBtn" class="btn primary" type="button">Search Modpacks</button>
+                </div>
+              </div>
+              <div id="modpackSearchResults" class="list"></div>
+              <div class="hint">Installs server-compatible files from a Modrinth <code>.mrpack</code> plus overrides.</div>
+            </div>
           </div>
           <div class="panel">
             <div class="panel-header">

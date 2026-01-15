@@ -24,9 +24,10 @@ class ModrinthService:
         loader: Optional[str],
         game_version: Optional[str],
         limit: int,
+        project_type: str = "mod",
     ) -> dict[str, Any]:
         params: dict[str, str] = {"query": query, "limit": str(limit)}
-        facets = self._build_facets(loader, game_version)
+        facets = self._build_facets(project_type, loader, game_version)
         if facets:
             params["facets"] = facets
         return self._get("/search", params)
@@ -63,8 +64,10 @@ class ModrinthService:
             )
         return response.json()
 
-    def _build_facets(self, loader: Optional[str], game_version: Optional[str]) -> str:
-        facets: list[list[str]] = [["project_type:mod"]]
+    def _build_facets(
+        self, project_type: str, loader: Optional[str], game_version: Optional[str]
+    ) -> str:
+        facets: list[list[str]] = [[f"project_type:{project_type}"]]
         if loader:
             facets.append([f"categories:{loader}"])
         if game_version:

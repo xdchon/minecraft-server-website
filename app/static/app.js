@@ -58,6 +58,10 @@ const modGameVersion = document.getElementById("modGameVersion");
 const modRestart = document.getElementById("modRestart");
 const modSearchBtn = document.getElementById("modSearchBtn");
 const modSearchResults = document.getElementById("modSearchResults");
+const modpackSearchInput = document.getElementById("modpackSearchInput");
+const modpackOverwrite = document.getElementById("modpackOverwrite");
+const modpackSearchBtn = document.getElementById("modpackSearchBtn");
+const modpackSearchResults = document.getElementById("modpackSearchResults");
 const installedMods = document.getElementById("installedMods");
 
 const consoleServerLabel = document.getElementById("consoleServerLabel");
@@ -87,6 +91,8 @@ let servers = [];
 let activeServerId = null;
 let modVersionCache = {};
 let modSearchToken = 0;
+let modpackVersionCache = {};
+let modpackSearchToken = 0;
 let lastModServerId = null;
 let modGameVersionOverrides = {};
 let liveLogsController = null;
@@ -864,6 +870,10 @@ function syncModFiltersWithServer() {
     modVersionCache = {};
     modSearchResults.innerHTML = "";
     modSearchInput.value = "";
+    modpackSearchToken += 1;
+    modpackVersionCache = {};
+    if (modpackSearchResults) modpackSearchResults.innerHTML = "";
+    if (modpackSearchInput) modpackSearchInput.value = "";
     lastModServerId = activeServerId;
   }
 
@@ -876,6 +886,12 @@ function syncModFiltersWithServer() {
     modSearchInput.disabled = true;
     modSearchBtn.disabled = true;
     modSearchResults.innerHTML = `<div class="list-item">Select a server to search mods.</div>`;
+    if (modpackSearchInput) modpackSearchInput.disabled = true;
+    if (modpackOverwrite) modpackOverwrite.disabled = true;
+    if (modpackSearchBtn) modpackSearchBtn.disabled = true;
+    if (modpackSearchResults) {
+      modpackSearchResults.innerHTML = `<div class="list-item">Select a server to search modpacks.</div>`;
+    }
     return;
   }
 
@@ -893,6 +909,12 @@ function syncModFiltersWithServer() {
     modSearchInput.disabled = true;
     modSearchBtn.disabled = true;
     modSearchResults.innerHTML = `<div class="list-item">Mods require a Fabric or Forge server.</div>`;
+    if (modpackSearchInput) modpackSearchInput.disabled = true;
+    if (modpackOverwrite) modpackOverwrite.disabled = true;
+    if (modpackSearchBtn) modpackSearchBtn.disabled = true;
+    if (modpackSearchResults) {
+      modpackSearchResults.innerHTML = `<div class="list-item">Modpacks require a Fabric or Forge server.</div>`;
+    }
     return;
   }
 
@@ -906,9 +928,20 @@ function syncModFiltersWithServer() {
 
   modSearchInput.disabled = false;
   modSearchBtn.disabled = false;
+  if (modpackSearchInput) modpackSearchInput.disabled = false;
+  if (modpackOverwrite) modpackOverwrite.disabled = false;
+  if (modpackSearchBtn) modpackSearchBtn.disabled = false;
 
   if (!normalizedVersion && !modGameVersion.value.trim() && !modSearchResults.firstElementChild) {
     modSearchResults.innerHTML = `<div class="list-item">Tip: enter a Game version to filter compatible mods and enable installs.</div>`;
+  }
+  if (
+    modpackSearchResults &&
+    !normalizedVersion &&
+    !modGameVersion.value.trim() &&
+    !modpackSearchResults.firstElementChild
+  ) {
+    modpackSearchResults.innerHTML = `<div class="list-item">Tip: enter a Game version to filter compatible modpacks and enable installs.</div>`;
   }
 }
 
@@ -1550,6 +1583,26 @@ async function fetchModVersions(projectId, loader, gameVersion) {
   return versions;
 }
 
+function getModpackCacheKey(projectId, loader, gameVersion) {
+  const versionKey = gameVersion || "any";
+  const loaderKey = loader || "any";
+  return `modpack::${projectId}::${loaderKey}::${versionKey}`;
+}
+
+async function fetchModpackVersions(projectId, loader, gameVersion) {
+  const cacheKey = getModpackCacheKey(projectId, loader, gameVersion);
+  if (modpackVersionCache[cacheKey]) {
+    return modpackVersionCache[cacheKey];
+  }
+  const params = new URLSearchParams();
+  if (loader) params.set("loader", loader);
+  if (gameVersion) params.set("game_version", gameVersion);
+  const response = await apiRequest(`/modpacks/${projectId}/versions?${params.toString()}`);
+  const versions = response.versions || [];
+  modpackVersionCache[cacheKey] = versions;
+  return versions;
+}
+
 function markModChecking(item, selectEl) {
   item.classList.remove("disabled");
   selectEl.disabled = true;
@@ -1723,6 +1776,146 @@ async function installMod(projectId, versionId) {
       body: JSON.stringify(payload),
     });
     toast("Mod installed", "success");
+    await loadMods();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function searchModpacks() {
+  if (!modpackSearchInput || !modpackSearchResults) return;
+  const query = modpackSearchInput.value.trim();
+  if (!query) {
+    toast("Enter a search term", "error");
+    return;
+  }
+  const context = getModContext();
+  if (context.error) {
+    toast(context.error, "error");
+    return;
+  }
+  if (!context.isModded) {
+    toast("Modpacks require a Fabric or Forge server", "error");
+    return;
+  }
+  modpackSearchResults.innerHTML = "";
+  try {
+    const params = new URLSearchParams({
+      query,
+      loader: context.loader,
+      limit: "12",
+    });
+    if (context.version) {
+      params.set("game_version", context.version);
+    }
+    const token = ++modpackSearchToken;
+    const response = await apiRequest(`/modpacks/search?${params.toString()}`);
+    renderModpackResults(response.results || [], context, token);
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+function renderModpackResults(results, context, token) {
+  if (!modpackSearchResults) return;
+  modpackSearchResults.innerHTML = "";
+  if (!results.length) {
+    const empty = document.createElement("div");
+    empty.className = "list-item";
+    empty.textContent = "No results found";
+    modpackSearchResults.appendChild(empty);
+    return;
+  }
+  const items = [];
+  results.forEach((pack) => {
+    const item = document.createElement("div");
+    item.className = "list-item";
+    item.dataset.projectId = pack.project_id;
+    item.innerHTML = `
+      <div>
+        <strong>${pack.title}</strong>
+        <div class="server-meta">${pack.description || ""}</div>
+      </div>
+      <div class="inline-input">
+        <button class="btn small" data-action="versions">Versions</button>
+        <select class="version-select"><option value="">Latest (auto)</option></select>
+        <button class="btn small primary" data-action="install">Install</button>
+      </div>
+    `;
+    modpackSearchResults.appendChild(item);
+    const selectEl = item.querySelector(".version-select");
+    markModChecking(item, selectEl);
+    items.push(item);
+  });
+  applyModpackCompatibility(items, context, token);
+}
+
+async function applyModpackCompatibility(items, context, token) {
+  const loader = context.loader;
+  const gameVersion = context.version;
+  await Promise.allSettled(
+    items.map(async (item) => {
+      const projectId = item.dataset.projectId;
+      const selectEl = item.querySelector(".version-select");
+      try {
+        const versions = await fetchModpackVersions(projectId, loader, gameVersion);
+        if (token !== modpackSearchToken) return;
+        if (!versions.length) {
+          setModIncompatible(item, selectEl);
+        } else {
+          setModCompatible(item, selectEl, versions);
+        }
+      } catch (err) {
+        if (token !== modpackSearchToken) return;
+        setModIncompatible(item, selectEl, "Error loading versions");
+      }
+    })
+  );
+}
+
+async function loadModpackVersions(projectId, selectEl, context) {
+  const versions = await fetchModpackVersions(projectId, context.loader, context.version);
+  populateVersionSelect(selectEl, versions);
+}
+
+async function installModpack(projectId, versionId) {
+  if (!activeServerId) {
+    toast("Select a server first", "error");
+    return;
+  }
+  const context = getModContext();
+  if (context.error) {
+    toast(context.error, "error");
+    return;
+  }
+  if (!context.isModded) {
+    toast("Modpacks require a Fabric or Forge server", "error");
+    return;
+  }
+  if (!context.version) {
+    toast("Set the Game version filter (or create the server with a specific version) to install modpacks.", "error");
+    return;
+  }
+  const overwrite = modpackOverwrite && modpackOverwrite.value === "true";
+  if (overwrite) {
+    const ok = window.confirm("Overwrite existing server files? This can replace configs and scripts.");
+    if (!ok) return;
+  }
+  const restart = modRestart.value === "true";
+  const payload = {
+    project_id: projectId,
+    version_id: versionId || null,
+    loader: context.loader,
+    game_version: context.version || null,
+    overwrite,
+  };
+  try {
+    const response = await apiRequest(`/servers/${activeServerId}/modpacks?restart=${restart}`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    const name = response.modpack_name || "Modpack";
+    toast(`${name} installed`, "success");
     await loadMods();
   } catch (err) {
     toast(err.message, "error");
@@ -1905,9 +2098,11 @@ function bindEvents() {
 
   modLoader.addEventListener("change", () => {
     modVersionCache = {};
+    modpackVersionCache = {};
   });
   modGameVersion.addEventListener("input", () => {
     modVersionCache = {};
+    modpackVersionCache = {};
     if (activeServerId) {
       modGameVersionOverrides[activeServerId] = modGameVersion.value.trim();
     }
@@ -1953,6 +2148,54 @@ function bindEvents() {
       await installMod(projectId, versionId);
     }
   });
+
+  if (modpackSearchBtn) {
+    modpackSearchBtn.addEventListener("click", searchModpacks);
+  }
+  if (modpackSearchInput) {
+    modpackSearchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        searchModpacks();
+      }
+    });
+  }
+  if (modpackSearchResults) {
+    modpackSearchResults.addEventListener("click", async (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      const item = button.closest(".list-item");
+      if (!item) return;
+      if (item.classList.contains("disabled")) return;
+      const projectId = item.dataset.projectId;
+      const selectEl = item.querySelector(".version-select");
+      const action = button.dataset.action;
+      const context = getModContext();
+      if (context.error) {
+        toast(context.error, "error");
+        return;
+      }
+      if (!context.isModded) {
+        toast("Modpacks require a Fabric or Forge server", "error");
+        return;
+      }
+      if (!context.version) {
+        toast("Set the Game version filter (or create the server with a specific version) to install modpacks.", "error");
+        return;
+      }
+      if (action === "versions") {
+        try {
+          await loadModpackVersions(projectId, selectEl, context);
+        } catch (err) {
+          toast(err.message, "error");
+        }
+      }
+      if (action === "install") {
+        const versionId = selectEl.value || null;
+        await installModpack(projectId, versionId);
+      }
+    });
+  }
 
   installedMods.addEventListener("click", (event) => {
     const action = event.target.dataset.action;
@@ -2000,6 +2243,7 @@ function bindEvents() {
 function bindTabGroups() {
   bindTabs("view-create");
   bindTabs("view-settings");
+  bindTabs("view-mods");
 }
 
 function getSettingsInputs() {

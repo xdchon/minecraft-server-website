@@ -40,6 +40,10 @@ from .models import (
     ModConfigUpdateRequest,
     ModSearchResponse,
     ModVersionResponse,
+    ModpackInstallRequest,
+    ModpackInstallResponse,
+    ModpackSearchResponse,
+    ModpackVersionResponse,
 )
 from .services.minecraft_service import MinecraftService, ServiceError
 from .services.metadata_service import MetadataService
@@ -403,6 +407,16 @@ def search_mods(
     data = modrinth.search(query, loader, game_version, limit)
     return ModSearchResponse(results=data.get("hits", []))
 
+@app.get("/modpacks/search", response_model=ModpackSearchResponse)
+def search_modpacks(
+    query: str,
+    loader: str = Query("fabric"),
+    game_version: str | None = Query(None),
+    limit: int = Query(10, ge=1, le=50),
+) -> ModpackSearchResponse:
+    data = modrinth.search(query, loader, game_version, limit, project_type="modpack")
+    return ModpackSearchResponse(results=data.get("hits", []))
+
 
 @app.get("/mods/{project_id}/versions", response_model=ModVersionResponse)
 def mod_versions(
@@ -412,6 +426,15 @@ def mod_versions(
 ) -> ModVersionResponse:
     versions = modrinth.get_versions(project_id, loader, game_version)
     return ModVersionResponse(versions=versions)
+
+@app.get("/modpacks/{project_id}/versions", response_model=ModpackVersionResponse)
+def modpack_versions(
+    project_id: str,
+    loader: str = Query("fabric"),
+    game_version: str | None = Query(None),
+) -> ModpackVersionResponse:
+    versions = modrinth.get_versions(project_id, loader, game_version)
+    return ModpackVersionResponse(versions=versions)
 
 
 @app.get("/servers/{server_id}/mods", response_model=ModListResponse)
@@ -426,6 +449,14 @@ def install_mod(
     restart: bool = Query(False),
 ) -> ModInstallResponse:
     return service.install_mod(server_id, request, restart)
+
+@app.post("/servers/{server_id}/modpacks", response_model=ModpackInstallResponse)
+def install_modpack(
+    server_id: str,
+    request: ModpackInstallRequest,
+    restart: bool = Query(False),
+) -> ModpackInstallResponse:
+    return service.install_modpack(server_id, request, restart)
 
 
 @app.delete("/servers/{server_id}/mods/{filename}", response_model=ModListResponse)

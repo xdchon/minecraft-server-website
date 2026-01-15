@@ -102,6 +102,31 @@ class ModListResponse(BaseModel):
     server_id: str
     mods: list[str]
 
+class ModpackSearchResponse(BaseModel):
+    results: list[dict]
+
+
+class ModpackVersionResponse(BaseModel):
+    versions: list[dict]
+
+
+class ModpackInstallRequest(BaseModel):
+    project_id: str = Field(..., min_length=1)
+    version_id: Optional[str] = None
+    loader: Optional[str] = None
+    game_version: Optional[str] = None
+    overwrite: bool = False
+
+
+class ModpackInstallResponse(BaseModel):
+    server_id: str
+    project_id: str
+    version_id: str
+    modpack_name: str
+    installed_files: int
+    skipped_files: int
+    overrides_applied: int
+
 class ModConfigFileInfo(BaseModel):
     path: str
     size_bytes: int

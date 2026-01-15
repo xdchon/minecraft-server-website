@@ -30,6 +30,8 @@ from ..models import (
     ModInstallRequest,
     ModInstallResponse,
     ModListResponse,
+    ModpackInstallRequest,
+    ModpackInstallResponse,
     ModConfigFileInfo,
     ModConfigFileResponse,
     ModConfigListResponse,
@@ -549,6 +551,84 @@ class MinecraftService:
                 raise ServiceError(500, f"Failed to restart server: {exc}") from exc
 
         return ModInstallResponse(server_id=server_id, filename=main_filename)
+
+    def install_modpack(
+        self,
+        server_id: str,
+        request: ModpackInstallRequest,
+        restart: bool,
+    ) -> ModpackInstallResponse:
+        container = self._get_container_by_server_id(server_id)
+        local_dir = self._get_local_dir(container, server_id)
+        self._validate_local_dir(local_dir)
+        self._require_local_dir_exists(local_dir)
+        self._assert_data_mount_matches(container, server_id)
+        self._ensure_modded(container)
+
+        try:
+            version_data = self._resolve_modpack_version(request)
+        except ModrinthError as exc:
+            raise ServiceError(exc.status_code, exc.message) from exc
+
+        file_info = self._select_modpack_file(version_data)
+        filename = file_info.get("filename")
+        url = file_info.get("url")
+        if not filename or not url:
+            raise ServiceError(500, "Modrinth modpack version is missing a file URL")
+        if not filename.lower().endswith(".mrpack"):
+            raise ServiceError(400, f"Unsupported modpack file type: {filename}")
+
+        import tempfile
+        import zipfile
+
+        installed_files = 0
+        skipped_files = 0
+        overrides_applied = 0
+        modpack_name = request.project_id
+        resolved_version_id = version_data.get("id") or request.version_id or ""
+
+        try:
+            with tempfile.TemporaryDirectory(prefix="temptcraft-modpack-") as tmpdir:
+                mrpack_path = os.path.join(tmpdir, filename)
+                try:
+                    self._download_file(url, mrpack_path)
+                except ModrinthError:
+                    raise
+                except OSError as exc:
+                    raise ServiceError(500, f"Failed to save modpack file: {exc}") from exc
+
+                with zipfile.ZipFile(mrpack_path, "r") as archive:
+                    index = self._read_modpack_index(archive)
+                    modpack_name = str(index.get("name") or modpack_name)
+                    self._assert_modpack_compatible(container, index)
+                    installed_files, skipped_files = self._install_modpack_files(
+                        local_dir,
+                        index.get("files") or [],
+                        overwrite=bool(request.overwrite),
+                    )
+                    overrides_applied = self._extract_modpack_overrides(
+                        local_dir, archive, overwrite=bool(request.overwrite)
+                    )
+        except zipfile.BadZipFile as exc:
+            raise ServiceError(400, f"Modpack archive is invalid: {exc}") from exc
+        except ModrinthError as exc:
+            raise ServiceError(exc.status_code, exc.message) from exc
+
+        if restart:
+            try:
+                container.restart()
+            except DockerException as exc:
+                raise ServiceError(500, f"Failed to restart server: {exc}") from exc
+
+        return ModpackInstallResponse(
+            server_id=server_id,
+            project_id=request.project_id,
+            version_id=str(resolved_version_id),
+            modpack_name=modpack_name,
+            installed_files=installed_files,
+            skipped_files=skipped_files,
+            overrides_applied=overrides_applied,
+        )
 
     def remove_mod(
         self, server_id: str, filename: str, restart: bool
@@ -1101,6 +1181,25 @@ class MinecraftService:
         if result.exit_code != 0:
             raise ServiceError(500, f"RCON command failed: {output.strip()}")
 
+    def _resolve_modpack_version(self, request: ModpackInstallRequest) -> dict:
+        if request.version_id:
+            try:
+                return self.modrinth.get_version(request.version_id)
+            except ModrinthError:
+                raise
+
+        if not request.project_id:
+            raise ServiceError(400, "project_id is required")
+        try:
+            versions = self.modrinth.get_versions(
+                request.project_id, request.loader, request.game_version
+            )
+        except ModrinthError:
+            raise
+        if not versions:
+            raise ServiceError(404, "No compatible versions found")
+        return versions[0]
+
     def _resolve_mod_version(self, request: ModInstallRequest) -> dict:
         if request.version_id:
             try:
@@ -1128,6 +1227,197 @@ class MinecraftService:
             if file_info.get("primary"):
                 return file_info
         return files[0]
+
+    def _select_modpack_file(self, version_data: dict) -> dict:
+        files = version_data.get("files") or []
+        if not files:
+            raise ServiceError(500, "Modrinth version has no files")
+
+        candidates: list[dict[str, Any]] = []
+        for file_info in files:
+            if isinstance(file_info, dict) and file_info.get("primary"):
+                candidates.append(file_info)
+        for file_info in files:
+            if isinstance(file_info, dict) and file_info not in candidates:
+                candidates.append(file_info)
+
+        for file_info in candidates:
+            filename = str(file_info.get("filename") or "")
+            if filename.lower().endswith(".mrpack"):
+                return file_info
+        return candidates[0] if candidates else files[0]
+
+    def _read_modpack_index(self, archive) -> dict[str, Any]:
+        try:
+            raw = archive.read("modrinth.index.json")
+        except KeyError as exc:
+            raise ServiceError(400, "Modpack is missing modrinth.index.json") from exc
+
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except Exception as exc:
+            raise ServiceError(400, f"Modpack index is invalid: {exc}") from exc
+
+        if not isinstance(data, dict):
+            raise ServiceError(400, "Modpack index is invalid")
+
+        game = str(data.get("game") or "").strip().lower()
+        if game and game != "minecraft":
+            raise ServiceError(400, f"Unsupported modpack game: {game}")
+
+        format_version = data.get("formatVersion")
+        if format_version is not None and format_version != 1:
+            raise ServiceError(400, f"Unsupported modpack formatVersion: {format_version}")
+
+        return data
+
+    def _assert_modpack_compatible(self, container, index: dict[str, Any]) -> None:
+        dependencies = index.get("dependencies")
+        if not isinstance(dependencies, dict):
+            dependencies = {}
+
+        required_loader: str | None = None
+        if "fabric-loader" in dependencies:
+            required_loader = "FABRIC"
+        if "forge" in dependencies:
+            if required_loader and required_loader != "FORGE":
+                raise ServiceError(409, "Modpack requires both Fabric and Forge (unsupported)")
+            required_loader = "FORGE"
+        if "quilt-loader" in dependencies:
+            raise ServiceError(409, "Quilt modpacks are not supported (Fabric/Forge only)")
+        if "neoforge" in dependencies:
+            raise ServiceError(409, "NeoForge modpacks are not supported (Fabric/Forge only)")
+
+        env_map = self._container_env_dict(container)
+        labels = container.labels or {}
+        server_type = (env_map.get("TYPE") or labels.get("mc.server_type") or "").strip().upper()
+        if required_loader and server_type and server_type != required_loader:
+            raise ServiceError(
+                409, f"Modpack requires {required_loader.title()} but server is {server_type.title()}"
+            )
+
+        required_mc = dependencies.get("minecraft")
+        if isinstance(required_mc, str) and required_mc.strip():
+            required_mc = required_mc.strip()
+            server_version = (env_map.get("VERSION") or labels.get("mc.version") or "").strip()
+            if server_version and server_version.lower() != "latest" and server_version != required_mc:
+                raise ServiceError(
+                    409,
+                    f"Modpack requires Minecraft {required_mc} but server is {server_version}",
+                )
+
+    def _resolve_modpack_target_path(self, local_dir: str, relative_path: str) -> str:
+        raw = (relative_path or "").strip().replace("\\", "/").lstrip("/")
+        normalized = os.path.normpath(raw).replace("\\", "/")
+        if normalized in {"", ".", ".."} or normalized.startswith("../"):
+            raise ServiceError(400, "Invalid modpack file path")
+
+        base_real = os.path.realpath(local_dir)
+        full_real = os.path.realpath(os.path.join(base_real, normalized))
+        if not full_real.startswith(base_real + os.sep):
+            raise ServiceError(400, "Invalid modpack file path")
+        return full_real
+
+    def _install_modpack_files(
+        self,
+        local_dir: str,
+        files: Any,
+        overwrite: bool,
+    ) -> tuple[int, int]:
+        if not isinstance(files, list):
+            raise ServiceError(400, "Modpack index files list is invalid")
+
+        import tempfile
+
+        installed = 0
+        skipped = 0
+        for entry in files:
+            if not isinstance(entry, dict):
+                continue
+
+            env = entry.get("env")
+            if isinstance(env, dict):
+                server_env = str(env.get("server") or "").lower()
+                if server_env == "unsupported":
+                    continue
+
+            path = entry.get("path")
+            if not isinstance(path, str) or not path.strip():
+                raise ServiceError(400, "Modpack entry is missing a file path")
+
+            downloads = entry.get("downloads") or []
+            if not isinstance(downloads, list) or not downloads:
+                raise ServiceError(500, f"Modpack entry is missing downloads for: {path}")
+            url = next((d for d in downloads if isinstance(d, str) and d.strip()), None)
+            if not url:
+                raise ServiceError(500, f"Modpack entry is missing downloads for: {path}")
+
+            dest_path = self._resolve_modpack_target_path(local_dir, path)
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+
+            if os.path.exists(dest_path) and not overwrite:
+                skipped += 1
+                continue
+
+            expected_hashes = entry.get("hashes")
+            hashes = expected_hashes if isinstance(expected_hashes, dict) else {}
+
+            tmp_handle = tempfile.NamedTemporaryFile(
+                dir=os.path.dirname(dest_path),
+                prefix=".tmp-modpack-",
+                delete=False,
+            )
+            tmp_path = tmp_handle.name
+            tmp_handle.close()
+
+            try:
+                self._download_file_verified(url, tmp_path, hashes=hashes)
+                os.replace(tmp_path, dest_path)
+            except OSError as exc:
+                raise ServiceError(500, f"Failed to save modpack file {path}: {exc}") from exc
+            finally:
+                if os.path.exists(tmp_path):
+                    try:
+                        os.remove(tmp_path)
+                    except OSError:
+                        pass
+
+            installed += 1
+
+        return installed, skipped
+
+    def _extract_modpack_overrides(
+        self,
+        local_dir: str,
+        archive,
+        overwrite: bool,
+    ) -> int:
+        overrides_prefix = "overrides/"
+        applied = 0
+
+        for info in archive.infolist():
+            name = str(getattr(info, "filename", "") or "")
+            if not name.startswith(overrides_prefix):
+                continue
+
+            rel = name[len(overrides_prefix) :]
+            if not rel or rel.endswith("/"):
+                continue
+
+            dest_path = self._resolve_modpack_target_path(local_dir, rel)
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+
+            if os.path.exists(dest_path) and not overwrite:
+                continue
+
+            try:
+                with archive.open(info, "r") as src, open(dest_path, "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+            except OSError as exc:
+                raise ServiceError(500, f"Failed to write modpack override {rel}: {exc}") from exc
+            applied += 1
+
+        return applied
 
     def _collect_required_dependencies(
         self,
@@ -1211,6 +1501,42 @@ class MinecraftService:
                         handle.write(chunk)
         except httpx.RequestError as exc:
             raise ModrinthError(502, f"Mod download failed: {exc}") from exc
+
+    def _download_file_verified(self, url: str, dest_path: str, hashes: dict[str, Any]) -> None:
+        import hashlib
+        import httpx
+
+        sha1_expected = hashes.get("sha1") if isinstance(hashes.get("sha1"), str) else None
+        sha512_expected = hashes.get("sha512") if isinstance(hashes.get("sha512"), str) else None
+        sha1 = hashlib.sha1() if sha1_expected else None
+        sha512 = hashlib.sha512() if sha512_expected else None
+
+        try:
+            with httpx.stream(
+                "GET",
+                url,
+                headers={"User-Agent": "TemptCraft/1.0"},
+                timeout=httpx.Timeout(30.0),
+            ) as response:
+                if response.status_code >= 400:
+                    raise ModrinthError(
+                        response.status_code,
+                        f"Modrinth download failed: {response.text}",
+                    )
+                with open(dest_path, "wb") as handle:
+                    for chunk in response.iter_bytes():
+                        handle.write(chunk)
+                        if sha1:
+                            sha1.update(chunk)
+                        if sha512:
+                            sha512.update(chunk)
+        except httpx.RequestError as exc:
+            raise ModrinthError(502, f"Mod download failed: {exc}") from exc
+
+        if sha1_expected and sha1 and sha1.hexdigest().lower() != sha1_expected.lower():
+            raise ServiceError(502, "Downloaded file sha1 hash does not match modpack index")
+        if sha512_expected and sha512 and sha512.hexdigest().lower() != sha512_expected.lower():
+            raise ServiceError(502, "Downloaded file sha512 hash does not match modpack index")
 
     def _recreate_container_for_port(self, container, server_id: str, new_port: int) -> None:
         current_container_port, current_host_port = self._get_primary_ports(container)
